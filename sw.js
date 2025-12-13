@@ -15,7 +15,20 @@ const CORE_ASSETS = [
 self.addEventListener("install", (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(APP_CACHE);
-    await cache.addAll(CORE_ASSETS);
+
+    const results = await Promise.allSettled(
+      CORE_ASSETS.map((p) => cache.add(p))
+    );
+
+    const failed = results
+      .map((r, i) => ({ r, i }))
+      .filter(x => x.r.status === "rejected")
+      .map(x => CORE_ASSETS[x.i]);
+
+    if (failed.length) {
+      console.warn("⚠️ cache add failed:", failed);
+    }
+
     self.skipWaiting();
   })());
 });
