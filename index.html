@@ -1,0 +1,3404 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>Today Focus Room</title>
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg-body: #000000;
+      --text-color: #f5f5f5;
+      --app-font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --overlay-bg: rgba(0, 0, 0, 0.55);
+      --card-bg: rgba(20, 20, 30, 0.85);
+      --card-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --muted-text: rgba(245, 245, 245, 0.8);
+      --btn-primary-bg: #4b6cff;
+      --btn-secondary-bg: rgba(255, 255, 255, 0.15);
+      --input-bg: rgba(0, 0, 0, 0.3);
+      --input-border: rgba(255, 255, 255, 0.2);
+      --chip-border: rgba(255, 255, 255, 0.2);
+      --chip-active-bg: rgba(255, 255, 255, 0.12);
+      --event-bg: rgba(255, 255, 255, 0.05);
+      --todo-bg: rgba(255, 255, 255, 0.04);
+    }
+
+    body[data-theme="light"] {
+      --bg-body: #f3f4f7;
+      --text-color: #222222;
+      --overlay-bg: rgba(255, 255, 255, 0.35);
+      --card-bg: rgba(255, 255, 255, 0.7);
+      --card-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      --card-border: rgba(0, 0, 0, 0.06);
+      --muted-text: rgba(80, 80, 80, 0.9);
+      --btn-primary-bg: #4b6cff;
+      --btn-secondary-bg: rgba(0, 0, 0, 0.06);
+      --input-bg: rgba(255, 255, 255, 0.9);
+      --input-border: rgba(0, 0, 0, 0.12);
+      --chip-border: rgba(0, 0, 0, 0.15);
+      --chip-active-bg: rgba(0, 0, 0, 0.05);
+      --event-bg: rgba(0, 0, 0, 0.05);
+      --todo-bg: rgba(0, 0, 0, 0.06);
+    }
+
+    /* 全画面背景 */
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: var(--app-font-family, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+      color: var(--text-color);
+      overflow: hidden;
+      background: var(--bg-body);
+    }
+
+    .background {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background: var(--bg-default-gradient);
+      overflow: hidden;
+      transition: background 1.2s ease-out;
+    }
+
+    .background iframe,
+    .background img,
+    .background video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border: none;
+      display: block;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.15);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .app {
+      position: relative;
+      z-index: 2;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 16px 24px;
+      box-sizing: border-box;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .header-left {
+      min-width: 170px;
+    }
+
+    header .title {
+      font-size: 1.4rem;
+      font-weight: 600;
+    }
+
+    header .date {
+      font-size: 0.9rem;
+      color: var(--muted-text);
+    }
+
+    .header-center {
+      flex: 1;
+      text-align: center;
+    }
+
+    .current-time {
+      font-size: clamp(3rem, 6vw, 4.8rem);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      line-height: 1.1;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .settings-panel {
+      position: absolute;
+      right: 24px;
+      top: 60px;
+      width: 280px;
+      max-height: calc(100vh - 80px);
+      background: var(--card-bg);
+      border-radius: 14px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+      border: 1px solid var(--card-border);
+      padding: 10px 12px 12px;
+      box-sizing: border-box;
+      display: none;
+      z-index: 10;
+      backdrop-filter: blur(18px);
+      overflow-y: auto;
+    }
+
+    .settings-panel.open {
+      display: block;
+    }
+
+    .settings-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .settings-panel-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .settings-panel-tag {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--chip-border);
+      background: rgba(0, 0, 0, 0.25);
+      color: var(--muted-text);
+    }
+
+    .settings-section {
+      padding: 6px 0 4px;
+    }
+
+    .settings-section + .settings-section {
+      margin-top: 6px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--card-border);
+    }
+
+    .settings-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+      opacity: 0.95;
+    }
+
+    .settings-label {
+      font-size: 0.8rem;
+      display: block;
+      margin-bottom: 4px;
+      opacity: 0.9;
+    }
+
+    .settings-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    /* 設定パネル内のセレクト共通スタイル */
+    .settings-panel select {
+      width: 100%;
+      padding: 4px 28px 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--input-border);
+      background: var(--input-bg);
+      color: var(--text-color);
+      font-size: 0.8rem;
+      box-sizing: border-box;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      box-shadow: inset 0 0 0 1px transparent;
+      transition: box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+      background-image:
+        linear-gradient(45deg, transparent 50%, var(--muted-text) 50%),
+        linear-gradient(135deg, var(--muted-text) 50%, transparent 50%);
+      background-position:
+        right 10px center,
+        right 6px center;
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+    }
+
+    .settings-panel select:hover {
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
+    }
+
+    .settings-panel select:focus {
+      outline: none;
+      border-color: rgba(100, 150, 255, 0.8);
+      box-shadow: 0 0 0 1px rgba(100, 150, 255, 0.9);
+    }
+
+    /* 設定パネル内のスライダー共通 */
+    .settings-panel input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      margin: 4px 0;
+      background: transparent;
+    }
+
+    .settings-panel input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px;
+      border-radius: 999px;
+      background: linear-gradient(
+        to right,
+        rgba(255, 255, 255, 0.35),
+        rgba(255, 255, 255, 0.1)
+      );
+    }
+
+    .settings-panel input[type="range"]::-moz-range-track {
+      height: 4px;
+      border-radius: 999px;
+      background: linear-gradient(
+        to right,
+        rgba(255, 255, 255, 0.35),
+        rgba(255, 255, 255, 0.1)
+      );
+    }
+
+    .settings-panel input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      margin-top: -5px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4);
+      cursor: pointer;
+    }
+
+    .settings-panel input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4);
+      cursor: pointer;
+    }
+
+    .settings-panel input[type="range"]:hover::-webkit-slider-thumb,
+    .settings-panel input[type="range"]:hover::-moz-range-thumb {
+      box-shadow:
+        0 0 0 2px rgba(100, 150, 255, 0.9),
+        0 0 10px rgba(100, 150, 255, 0.7);
+    }
+
+    /* ===== ライトテーマ用：スライダー視認性UP ===== */
+    body[data-theme="light"] .settings-panel input[type="range"]::-webkit-slider-runnable-track {
+      background: linear-gradient(
+        to right,
+        rgba(0, 0, 0, 0.35),
+        rgba(0, 0, 0, 0.15)
+      ) !important;
+    }
+
+    body[data-theme="light"] .settings-panel input[type="range"]::-moz-range-track {
+      background: linear-gradient(
+        to right,
+        rgba(0, 0, 0, 0.35),
+        rgba(0, 0, 0, 0.15)
+      ) !important;
+    }
+
+    /* ノブ（白丸→薄グレー＋縁で見やすく） */
+    body[data-theme="light"] .settings-panel input[type="range"]::-webkit-slider-thumb {
+      background: #e0e0e0 !important;
+      box-shadow: 0 0 0 2px rgba(120, 120, 120, 0.4) !important;
+    }
+
+    body[data-theme="light"] .settings-panel input[type="range"]::-moz-range-thumb {
+      background: #e0e0e0 !important;
+      box-shadow: 0 0 0 2px rgba(120, 120, 120, 0.4) !important;
+    }
+
+    /* ホバー時：ノブが濃く見えるようにライトテーマ専用の強調 */
+    body[data-theme="light"] .settings-panel input[type="range"]:hover::-webkit-slider-thumb,
+    body[data-theme="light"] .settings-panel input[type="range"]:hover::-moz-range-thumb {
+      box-shadow:
+        0 0 0 2px rgba(100, 150, 255, 0.9),
+        0 0 8px rgba(100, 150, 255, 0.6) !important;
+    }
+
+    /* モードごとの画面エフェクト（強め） */
+    #modeOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.45s ease-out, filter 0.45s ease-out;
+    }
+
+    /* 集中：少し緊張感、コントラスト上げる＆ビネット */
+    body.focus-mode #modeOverlay {
+      opacity: 0.75;
+      background:
+        radial-gradient(1200px 600px at 50% 20%, rgba(90, 130, 220, 0.55), transparent 60%),
+        radial-gradient(900px 900px at 20% 80%, rgba(20, 50, 120, 0.55), transparent 65%),
+        radial-gradient(1400px 900px at 80% 85%, rgba(10, 25, 60, 0.6), transparent 70%),
+        radial-gradient(circle at 50% 50%, transparent 55%, rgba(0,0,0,0.55) 100%);
+      filter: saturate(1.05) contrast(1.08);
+    }
+
+    /* 休憩：ゆらぎ（動的）＋柔らかい緑寄り */
+    body.break-mode #modeOverlay {
+      opacity: 0.65;
+      background:
+        radial-gradient(1000px 700px at 15% 15%, rgba(110, 170, 140, 0.55), transparent 62%),
+        radial-gradient(900px 700px at 85% 25%, rgba(60, 120, 95, 0.45), transparent 62%),
+        radial-gradient(1100px 900px at 60% 90%, rgba(30, 70, 55, 0.55), transparent 70%),
+        radial-gradient(circle at 50% 50%, transparent 58%, rgba(0,0,0,0.5) 100%);
+      filter: saturate(1.0) contrast(1.02);
+      animation: breakDrift 10s ease-in-out infinite alternate;
+    }
+
+    @keyframes breakDrift {
+      from { transform: translate3d(-6px, -4px, 0) scale(1.01); }
+      to   { transform: translate3d( 6px,  4px, 0) scale(1.03); }
+    }
+
+    main {
+      display: grid;
+      gap: 16px;
+      height: calc(100% - 56px);
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-sizing: border-box;
+      box-shadow: var(--card-shadow);
+      border: 1px solid var(--card-border);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      backdrop-filter: blur(12px);
+    }
+
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 4px;
+    }
+
+    /* タイマー部分 */
+    .timer-display {
+      font-size: 2.6rem;
+      text-align: center;
+      margin: 4px 0 8px;
+      letter-spacing: 0.08em;
+    }
+
+    .timer-mode {
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--muted-text);
+      margin-bottom: 4px;
+    }
+
+    .timer-controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    button {
+      background: var(--btn-primary-bg);
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: transform 0.05s ease, box-shadow 0.1s ease, background 0.1s ease;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+      white-space: nowrap;
+    }
+
+    button.secondary {
+      background: var(--btn-secondary-bg);
+      color: var(--text-color);
+      box-shadow: none;
+    }
+
+    button.small-btn {
+      padding: 4px 8px;
+      font-size: 0.8rem;
+      box-shadow: none;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+      filter: brightness(1.05);
+    }
+
+    button.secondary:hover {
+      box-shadow: none;
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+      box-shadow: none;
+      filter: brightness(0.95);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .timer-settings {
+      display: flex;
+      gap: 8px;
+      font-size: 0.8rem;
+      margin-bottom: 6px;
+      justify-content: center;
+    }
+
+    .timer-settings label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .timer-settings input {
+      width: 40px;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-color);
+      border-radius: 6px;
+      padding: 2px 4px;
+    }
+
+    .session-log {
+      flex: 1;
+      overflow-y: auto;
+      font-size: 0.8rem;
+      border-top: 1px solid var(--card-border);
+      margin-top: 6px;
+      padding-top: 6px;
+    }
+
+    .session-item {
+      margin-bottom: 6px;
+      padding: 4px 8px;
+      border-radius: 8px;
+      background: var(--todo-bg);
+      border: 1px solid var(--card-border);
+    }
+
+    /* 今日の予定・タスク */
+    .events-list,
+    .todo-list {
+      flex: 1;
+      overflow-y: auto;
+      font-size: 0.8rem;
+    }
+
+    .event-item {
+      margin-bottom: 6px;
+      padding: 4px 6px 4px 8px;
+      border-radius: 8px;
+      background: var(--event-bg);
+      border-left: 4px solid rgba(255, 255, 255, 0.5);
+    }
+
+    .event-time {
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+
+    .event-title {
+      margin-top: 2px;
+    }
+
+    .todo-input {
+      display: flex;
+      margin-bottom: 6px;
+      gap: 6px;
+    }
+
+    .todo-input input {
+      flex: 1;
+      padding: 4px 6px;
+      border-radius: 8px;
+      border: 1px solid var(--input-border);
+      background: var(--input-bg);
+      color: var(--text-color);
+    }
+
+    .todo-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+      padding: 4px 8px;
+      border-radius: 8px;
+      background: var(--todo-bg);
+      border: 1px solid var(--card-border);
+    }
+
+    .todo-item.completed {
+      opacity: 0.5;
+      text-decoration: line-through;
+    }
+
+    /* ルーティーン入力 & レイアウト */
+    .routine-input-wrapper {
+      margin-top: 8px;
+      margin-bottom: 8px;
+    }
+
+    .routine-input-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .routine-input-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1 1 160px;
+    }
+
+    .routine-input-group input[type="time"] {
+      width: 80px;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-color);
+      border-radius: 8px;
+      padding: 3px 6px;
+    }
+
+    .routine-input-group input[type="text"] {
+      flex: 1;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-color);
+      border-radius: 8px;
+      padding: 3px 6px;
+    }
+
+    .routine-input-separator {
+      font-size: 0.8rem;
+      color: var(--muted-text);
+    }
+
+    .routine-day-view {
+      margin-top: 8px;
+      display: grid;
+      grid-template-columns: 40px 1fr;
+      gap: 8px;
+      align-items: stretch;
+      flex: 1;
+      min-height: 220px;
+    }
+
+    .routine-time-axis {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: var(--muted-text);
+    }
+
+    .routine-events {
+      position: relative;
+      height: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+      background: linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.05) 1px,
+        transparent 1px
+      );
+      background-size: 100% 30px;
+      overflow: hidden;
+    }
+
+    .routine-now-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: rgba(255, 210, 127, 0.95);
+      box-shadow: 0 0 8px rgba(255, 210, 127, 0.9);
+    }
+
+    /* ルーティーンブロック本体 */
+    .routine-block {
+      position: absolute;
+      left: 6px;
+      right: 6px;
+      min-height: 24px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.22);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      font-size: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      cursor: default;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      overflow: hidden; /* はみ出し防止 */
+      border-left: 4px solid rgba(255,255,255,0.55);
+    }
+
+    /* 上下リサイズ用ハンドル：ブロックの上下端に固定 */
+    .routine-resize-handle {
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      height: 3px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.4);
+      opacity: 0.5;
+      cursor: ns-resize;
+      z-index: 2;
+    }
+
+    .routine-resize-top {
+      top: 0;
+    }
+
+    .routine-resize-bottom {
+      bottom: 0;
+    }
+
+    .routine-resize-handle:hover {
+      opacity: 0.9;
+    }
+
+    /* 中身はハンドルと被らないように少し余白を確保 */
+    .routine-block-body {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: default;
+      padding-top: 6px;
+      padding-bottom: 6px;
+    }
+
+    /* 左側のドラッグ用ハンドル（位置はそのままでOK） */
+    .routine-drag-handle {
+      width: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.7);
+      flex-shrink: 0;
+      align-self: stretch;
+      cursor: grab;
+    }
+
+    .routine-drag-handle:active {
+      cursor: grabbing;
+    }
+
+    .routine-block-time {
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+
+    .routine-block-label {
+      flex: 1;
+    }
+
+    .routine-block.current {
+      border-color: #ffd27f;
+      box-shadow: 0 0 0 1px rgba(255,210,127,0.9), 0 4px 12px rgba(0,0,0,0.4);
+    }
+
+    .routine-popup {
+      position: fixed;
+      z-index: 2000;
+    }
+
+    .routine-popup-inner {
+      background: var(--card-bg);
+      border-radius: 10px;
+      border: 1px solid var(--card-border);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      padding: 10px 12px;
+      min-width: 220px;
+      max-width: 260px;
+      font-size: 0.8rem;
+    }
+
+    .routine-popup-title {
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .routine-popup-field {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-bottom: 6px;
+      font-size: 0.8rem;
+    }
+
+    .routine-popup-field input {
+      padding: 3px 6px;
+      border-radius: 6px;
+      border: 1px solid var(--input-border);
+      background: var(--input-bg);
+      color: var(--text-color);
+    }
+
+    .routine-popup-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .routine-popup-row .small-field {
+      flex: 1;
+    }
+
+    .routine-popup-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+
+    #routineCard {
+      overflow-y: auto;  /* カード内だけスクロールできるように */
+    }
+
+    #routineCard .routine-day-view {
+      min-height: 220px;   /* 260px → 少し低く */
+    }
+
+    /* 通知 */
+    #notificationContainer {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .notification {
+      min-width: 220px;
+      max-width: 280px;
+      background: var(--card-bg);
+      color: var(--text-color);
+      border-radius: 10px;
+      padding: 8px 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+      border: 1px solid var(--card-border);
+      font-size: 0.8rem;
+      transform: translateX(120%);
+      opacity: 0;
+      transition: transform 0.25s ease-out, opacity 0.25s ease-out;
+    }
+
+    .notification.show {
+      transform: translateX(0);
+      opacity: 1;
+    }
+
+    .notification-title {
+      font-weight: 600;
+      margin-bottom: 2px;
+      font-size: 0.85rem;
+    }
+
+    .notification-body {
+      font-size: 0.8rem;
+    }
+
+    /* バックアップ */
+    .backup-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .small {
+      font-size: 0.75rem;
+      color: var(--muted-text);
+    }
+
+    /* 背景設定 */
+    .bg-settings {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.8rem;
+    }
+
+    .bg-settings input {
+      width: 100%;
+      padding: 3px 6px;
+      border-radius: 6px;
+      border: 1px solid var(--input-border);
+      background: var(--input-bg);
+      color: var(--text-color);
+      box-sizing: border-box;
+    }
+
+    /* カレンダーフィルタ */
+    #calendarFilters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 2px 0 4px;
+    }
+
+    .calendar-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--chip-border);
+      background: transparent;
+      font-size: 0.75rem;
+      cursor: pointer;
+      opacity: 0.8;
+      transition: background 0.1s ease, opacity 0.1s ease, transform 0.05s ease;
+    }
+
+    .calendar-pill.active {
+      background: var(--chip-active-bg);
+      opacity: 1;
+      transform: translateY(-1px);
+    }
+
+    .gcal-all-day {
+      min-height: 24px;
+      margin-top: 6px;
+      margin-bottom: 4px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .gcal-all-day-pill {
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.08);
+      font-size: 0.75rem;
+    }
+
+    /* Googleカレンダーのタイムライン用ブロック */
+    .gcal-event-block {
+      font-size: 0.7rem;
+      padding: 2px 4px;
+      overflow: hidden;           /* 中身がはみ出さないように */
+    }
+
+    /* タイトルは一行＋省略表示 */
+    .gcal-event-block .routine-block-label {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .cal-color-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 1100px) {
+      html, body {
+        height: auto;
+        overflow-y: auto;   /* ★縦スクロールON */
+        overflow-x: hidden;
+      }
+
+      .app {
+        height: auto;       /* ★固定高さをやめる */
+        min-height: 100vh;  /* ★最低でも画面いっぱい */
+      }
+
+      main {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+      .app {
+        padding: 12px;
+      }
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .header-center {
+        text-align: left;
+      }
+      .current-time {
+        font-size: clamp(2.4rem, 7vw, 3.6rem);
+      }
+    }
+  </style>
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#000000">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body>
+  <!-- 背景 -->
+  <div class="background" id="background">
+    <video id="bgVideo"
+           autoplay
+           muted
+           loop
+           playsinline
+    ></video>
+  </div>
+  <div class="overlay"></div>
+  <!-- モードごとの色味エフェクト -->
+  <div id="modeOverlay"></div>
+
+  <div class="app">
+    <header>
+      <div class="header-left">
+        <div class="title">Today Focus Room</div>
+        <div class="date" id="todayText"></div>
+      </div>
+      <div class="header-center">
+        <div class="current-time" id="currentTime">--:--:--</div>
+      </div>
+      <div class="header-right">
+        <button id="themeToggle" class="secondary small-btn">🌓</button>
+        <button id="settingsToggle" class="secondary small-btn">⚙ 設定</button>
+        <button id="authorize_button">Google カレンダー連携</button>
+        <button id="signout_button" style="display:none;" class="secondary small-btn">ログアウト</button>
+      </div>
+    </header>
+
+    <div id="settingsPanel" class="settings-panel">
+      <div class="settings-panel-header">
+        <div class="settings-panel-title">Settings</div>
+        <div class="settings-panel-tag">Today Focus Room</div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-title">背景設定</div>
+        <label class="settings-label">
+          背景動画ファイル
+          <input type="file" id="bgVideoInput" accept="video/*" />
+        </label>
+        <div class="small">
+          ※ mp4 などの動画ファイルを選ぶと、ミュートでループ再生されます。
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">フォント設定</div>
+        <label class="settings-label" for="fontSelect">全体のフォント</label>
+        <select id="fontSelect"
+                style="width:100%; padding:4px 6px; border-radius:6px;
+                       border:1px solid var(--input-border);
+                       background:var(--input-bg); color:var(--text-color);">
+          <option value="system">システム標準</option>
+          <option value="rounded">やわらか丸ゴシック</option>
+          <option value="serif">明朝っぽく落ち着いた雰囲気</option>
+          <option value="mono">コード風モノスペース</option>
+        </select>
+        <div class="small">※ 画面全体で使うフォントの雰囲気を変えられます。</div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">バックアップ / 復元</div>
+        <div class="settings-buttons">
+          <button id="exportJsonBtn" class="secondary small-btn">JSONを書き出し</button>
+          <button id="importJsonBtn" class="secondary small-btn">JSON読み込み</button>
+          <input type="file" id="importJsonInput" accept="application/json" style="display:none;">
+        </div>
+        <div class="small">※ タスク / ルーティーン / セッションログが対象です。</div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">サウンド</div>
+        <div class="settings-buttons">
+          <button id="enableNotifyBtn" class="secondary small-btn">🔔 通知を有効化</button>
+          <button id="testNotifyBtn" class="secondary small-btn">🧪 通知テスト</button>
+        </div>
+        <div class="small">※ まずこのボタンを1回押すと、以降タイマー終了音が鳴りやすくなります。</div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">カラム順</div>
+        <div class="small">1列目〜4列目に表示する内容を選べます。</div>
+        <div class="settings-buttons" style="flex-direction:column; align-items:stretch; gap:4px;">
+          <label class="settings-label">
+            1列目:
+            <select id="colOrder1">
+              <option value="timer">タイマー</option>
+              <option value="todo">タスク</option>
+              <option value="calendar">カレンダー</option>
+              <option value="routine">ルーティーン</option>
+            </select>
+          </label>
+          <label class="settings-label">
+            2列目:
+            <select id="colOrder2">
+              <option value="timer">タイマー</option>
+              <option value="todo">タスク</option>
+              <option value="calendar">カレンダー</option>
+              <option value="routine">ルーティーン</option>
+            </select>
+          </label>
+          <label class="settings-label">
+            3列目:
+            <select id="colOrder3">
+              <option value="timer">タイマー</option>
+              <option value="todo">タスク</option>
+              <option value="calendar">カレンダー</option>
+              <option value="routine">ルーティーン</option>
+            </select>
+          </label>
+          <label class="settings-label">
+            4列目:
+            <select id="colOrder4">
+              <option value="timer">タイマー</option>
+              <option value="todo">タスク</option>
+              <option value="calendar">カレンダー</option>
+              <option value="routine">ルーティーン</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">カラム幅</div>
+        <div class="small">左から順に、タイマー / タスク / カレンダー / ルーティーン の幅です。</div>
+        <div class="settings-buttons" style="flex-direction:column; align-items:stretch; gap:4px;">
+          <label class="settings-label">
+            カラム1:
+            <input type="range" id="colWidth1" min="0.7" max="1.8" step="0.1">
+          </label>
+          <label class="settings-label">
+            カラム2:
+            <input type="range" id="colWidth2" min="0.7" max="1.8" step="0.1">
+          </label>
+          <label class="settings-label">
+            カラム3:
+            <input type="range" id="colWidth3" min="0.7" max="1.8" step="0.1">
+          </label>
+          <label class="settings-label">
+            カラム4:
+            <input type="range" id="colWidth4" min="0.7" max="1.8" step="0.1">
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <main id="layoutMain">
+      <!-- 左：タイマー＋ログ -->
+      <section class="card" id="timerCard" data-col-id="timer">
+        <h2>作業タイマー & ログ</h2>
+        <div class="timer-mode" id="timerMode">モード: 集中</div>
+        <div class="timer-display" id="timerDisplay">25:00</div>
+
+        <div class="timer-controls">
+          <button id="startBtn">スタート</button>
+          <button id="pauseBtn" class="secondary">一時停止</button>
+          <button id="finishNowBtn" class="secondary">作業終了</button>
+          <button id="resetBtn" class="secondary">リセット</button>
+          <button id="switchModeBtn" class="secondary">休憩に切替</button>
+        </div>
+
+        <div class="timer-settings">
+          <label>集中(分)
+            <input type="number" id="focusMinutes" value="25" min="1" />
+          </label>
+          <label>休憩(分)
+            <input type="number" id="breakMinutes" value="5" min="1" />
+          </label>
+        </div>
+
+        <div class="small">※ タイマー終了または「作業終了」ボタンで、そのセッションのログを残せます。</div>
+
+        <div class="session-log" id="sessionLog"></div>
+
+        <div class="small" style="margin-top:4px;">
+          <button id="toggleSessionArchive" class="secondary small-btn">
+            📚 アーカイブを見る
+          </button>
+        </div>
+        <div class="session-log" id="sessionArchive" style="display:none; max-height:120px;"></div>
+      </section>
+
+      <!-- 中左：今日のタスク -->
+      <section class="card" id="todoCard" data-col-id="todo">
+        <h2>今日のタスク</h2>
+        <div class="todo-input">
+          <input type="text" id="todoInput" placeholder="タスクを入力..." />
+          <button id="addTodoBtn">追加</button>
+        </div>
+        <div class="todo-list" id="todoList"></div>
+
+        <div class="small" style="margin-top:4px;">
+          <button id="toggleTodoArchive" class="secondary small-btn">
+            📚 アーカイブされたタスクを見る
+          </button>
+        </div>
+        <div class="todo-list" id="todoArchiveList" style="display:none; max-height:140px;"></div>
+      </section>
+
+      <!-- 中右：今日の1日カレンダー -->
+      <section class="card" id="calendarCard" data-col-id="calendar">
+        <h2>今日のカレンダー</h2>
+        <div class="small" id="gcalStatus">Googleカレンダー: 未接続</div>
+
+        <div class="small" style="margin-top:4px;">
+          表示するカレンダー：
+        </div>
+        <div class="small" id="calendarFilters"></div>
+
+        <div class="events-list" id="eventsList" style="display:none;"></div>
+
+        <div class="small" style="margin-top:6px;">
+          終日の予定：
+        </div>
+        <div id="gcalAllDayContainer" class="gcal-all-day"></div>
+
+        <div class="routine-day-view">
+          <div class="routine-time-axis">
+            <span>0:00</span>
+            <span>6:00</span>
+            <span>12:00</span>
+            <span>18:00</span>
+            <span>24:00</span>
+          </div>
+          <div class="routine-events" id="gcalDayEvents">
+            <div class="routine-now-line" id="gcalNowLine"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 右：ルーティーン専用カラム -->
+      <section class="card" id="routineCard" data-col-id="routine">
+        <h2>今日のルーティーン</h2>
+        <div class="small">1日の流れと「今ここ」がひと目でわかります。</div>
+
+        <!-- 先に入力フォームを上に配置 -->
+        <div class="routine-input-wrapper">
+          <div class="routine-input-row">
+            <div class="routine-input-group">
+              <input type="time" id="routineStartInput" />
+              <span class="routine-input-separator">〜</span>
+              <input type="time" id="routineEndInput" />
+            </div>
+            <div class="routine-input-group">
+              <input type="text" id="routineLabelInput" placeholder="例: 朝のストレッチ" />
+              <button id="addRoutineBtn" class="small-btn">追加</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="routine-day-view">
+          <div class="routine-time-axis">
+            <span>0:00</span>
+            <span>6:00</span>
+            <span>12:00</span>
+            <span>18:00</span>
+            <span>24:00</span>
+          </div>
+
+          <div class="routine-events" id="routineEvents">
+            <div class="routine-now-line" id="routineNowLine"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ルーティーン編集ポップアップ -->
+  <div id="routineEditPopup" class="routine-popup" style="display:none;">
+    <div class="routine-popup-inner">
+      <div class="routine-popup-title">ルーティーン編集</div>
+
+      <label class="routine-popup-field">
+        タイトル
+        <input type="text" id="routinePopupLabel" />
+      </label>
+
+      <div class="routine-popup-row">
+        <label class="routine-popup-field small-field">
+          開始
+          <input type="time" id="routinePopupStart" />
+        </label>
+        <span class="routine-input-separator">〜</span>
+        <label class="routine-popup-field small-field">
+          終了
+          <input type="time" id="routinePopupEnd" />
+        </label>
+      </div>
+
+      <div class="routine-popup-actions">
+        <button id="routinePopupDelete" class="secondary small-btn">削除</button>
+        <button id="routinePopupCancel" class="secondary small-btn">キャンセル</button>
+        <button id="routinePopupSave" class="small-btn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- セッションメモ入力モーダル -->
+  <div id="logModalBackdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+    <div id="logModal" style="background: var(--card-bg); color: var(--text-color); border-radius: 12px; padding: 16px; max-width: 360px; width: 90%; box-shadow: 0 10px 30px rgba(0,0,0,0.4); border: 1px solid var(--card-border);">
+      <div id="logModalTitle" style="margin-bottom:8px; font-weight:600; font-size:0.95rem;"></div>
+      <div class="small" style="margin-bottom:4px;">何をしていましたか？メモを残せます。</div>
+      <textarea id="logNoteInput" rows="4" style="width:100%; box-sizing:border-box; border-radius:8px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-color); padding:6px; margin-bottom:8px; resize:vertical; font-size:0.85rem;"></textarea>
+      <div style="display:flex; justify-content:flex-end; gap:6px;">
+        <button id="logCancelBtn" class="secondary small-btn">キャンセル</button>
+        <button id="logSaveBtn" class="small-btn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // どこでも最初の1回の操作で音を解錠（超重要）
+    window.addEventListener('pointerdown', async () => {
+      await unlockAudio();
+    }, { once: true });
+    // ===== フォント設定 =====
+    const FONT_KEY = 'tfr-font';
+
+    function applyFont(fontKey) {
+      let stack;
+      switch (fontKey) {
+        case 'rounded':
+          stack = '"M PLUS Rounded 1c", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+          break;
+        case 'serif':
+          stack = '"Yu Mincho", "Hiragino Mincho ProN", "Times New Roman", serif';
+          break;
+        case 'mono':
+          stack = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+          break;
+        case 'system':
+        default:
+          stack = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+          break;
+      }
+
+      document.documentElement.style.setProperty('--app-font-family', stack);
+      localStorage.setItem(FONT_KEY, fontKey);
+
+      const select = document.getElementById('fontSelect');
+      if (select && select.value !== fontKey) {
+        select.value = fontKey;
+      }
+    }
+
+    const savedFont = localStorage.getItem(FONT_KEY) || 'system';
+    applyFont(savedFont);
+
+    // ===== テーマ（ライト / ダーク） =====
+    const themeToggle = document.getElementById('themeToggle');
+    function applyTheme(theme) {
+      document.body.setAttribute('data-theme', theme);
+      localStorage.setItem('tfr-theme', theme);
+      themeToggle.textContent = theme === 'dark' ? '🌓' : '☀️';
+      applyRandomGradient();
+    }
+    const savedTheme = localStorage.getItem('tfr-theme') || 'dark';
+    applyTheme(savedTheme);
+    themeToggle.addEventListener('click', () => {
+      const current = document.body.getAttribute('data-theme') || 'dark';
+      applyTheme(current === 'dark' ? 'light' : 'dark');
+    });
+
+    // DOM構築後にフォントセレクトと連動
+    window.addEventListener('DOMContentLoaded', () => {
+      const fontSelect = document.getElementById('fontSelect');
+      if (fontSelect) {
+        fontSelect.value = savedFont;
+        fontSelect.addEventListener('change', () => {
+          applyFont(fontSelect.value);
+        });
+      }
+    });
+
+    // ===== 日付表示 =====
+    function updateTodayText() {
+      const now = new Date();
+      const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' };
+      document.getElementById('todayText').textContent =
+        now.toLocaleDateString('ja-JP', options);
+    }
+    updateTodayText();
+
+    // ===== 現在時刻（大きな時計） =====
+    const currentTimeEl = document.getElementById('currentTime');
+    function updateCurrentTime() {
+      const now = new Date();
+      currentTimeEl.textContent = now.toLocaleTimeString('ja-JP', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    }
+    updateCurrentTime();
+    setInterval(updateCurrentTime, 1000);
+
+    const settingsToggle = document.getElementById('settingsToggle');
+    const settingsPanel = document.getElementById('settingsPanel');
+
+    function applyRandomGradient() {
+      const isDark = document.body.getAttribute("data-theme") === "dark";
+
+      const darkGradients = [
+        ["#0f2027", "#203a43"],
+        ["#1a1f2b", "#3a4458"],
+        ["#1b2735", "#2c3e50"],
+        ["#232526", "#414345"],
+        ["#243B55", "#141E30"]
+      ];
+
+      const lightGradients = [
+        ["#e8edf1", "#d6dde3"],
+        ["#f3f5f7", "#e1e6eb"],
+        ["#fafbfc", "#e8eef2"],
+        ["#f2f4f6", "#dfe4ea"],
+        ["#f7f9fa", "#e5eaef"]
+      ];
+
+      const list = isDark ? darkGradients : lightGradients;
+      const [c1, c2] = list[Math.floor(Math.random() * list.length)];
+
+      document.documentElement.style.setProperty(
+        "--bg-default-gradient",
+        `linear-gradient(to bottom right, ${c1}, ${c2})`
+      );
+    }
+
+    if (settingsToggle && settingsPanel) {
+      settingsToggle.addEventListener('click', () => {
+        settingsPanel.classList.toggle('open');
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!settingsPanel.classList.contains('open')) return;
+        const insidePanel = e.target.closest('#settingsPanel');
+        const insideToggle = e.target.closest('#settingsToggle');
+        if (!insidePanel && !insideToggle) {
+          settingsPanel.classList.remove('open');
+        }
+      });
+    }
+
+    // ===== カラム幅調整 =====
+    const layoutMain = document.getElementById('layoutMain');
+    const colWidthInputs = [
+      document.getElementById('colWidth1'),
+      document.getElementById('colWidth2'),
+      document.getElementById('colWidth3'),
+      document.getElementById('colWidth4'),
+    ];
+    const COL_WIDTH_KEY = 'tfr-col-widths';
+
+    function loadColWidths() {
+      const raw = localStorage.getItem(COL_WIDTH_KEY);
+      if (!raw) return [1.1, 0.9, 1.2, 0.9];
+      try {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.length === 4) return arr;
+        return [1.1, 0.9, 1.2, 0.9];
+      } catch {
+        return [1.1, 0.9, 1.2, 0.9];
+      }
+    }
+
+    function saveColWidths(widths) {
+      localStorage.setItem(COL_WIDTH_KEY, JSON.stringify(widths));
+    }
+
+    function applyColWidths(widths) {
+      if (!layoutMain) return;
+      const isNarrow = window.innerWidth <= 1100;
+      layoutMain.style.gridTemplateColumns = isNarrow
+        ? '1fr'
+        : widths.map(w => `${w}fr`).join(' ');
+    }
+
+    let currentColWidths = loadColWidths();
+    applyColWidths(currentColWidths);
+
+    if (colWidthInputs.every(Boolean)) {
+      colWidthInputs.forEach((input, idx) => {
+        input.value = currentColWidths[idx];
+        input.addEventListener('input', () => {
+          const newWidths = colWidthInputs.map(i => parseFloat(i.value) || 1);
+          currentColWidths = newWidths;
+          applyColWidths(currentColWidths);
+          saveColWidths(currentColWidths);
+        });
+      });
+    }
+
+    window.addEventListener('resize', () => {
+      applyColWidths(currentColWidths);
+    });
+
+    // ===== カラム順の管理 =====
+    const COL_ORDER_KEY = 'tfr-col-order';
+    const columnCards = document.querySelectorAll('#layoutMain section.card');
+    const colOrderSelects = [
+      document.getElementById('colOrder1'),
+      document.getElementById('colOrder2'),
+      document.getElementById('colOrder3'),
+      document.getElementById('colOrder4'),
+    ];
+
+    function loadColOrder() {
+      const raw = localStorage.getItem(COL_ORDER_KEY);
+      const defaultOrder = ['timer', 'todo', 'calendar', 'routine'];
+      if (!raw) return defaultOrder;
+      try {
+        const arr = JSON.parse(raw);
+        if (!Array.isArray(arr)) return defaultOrder;
+        const set = new Set(arr);
+        const all = ['timer', 'todo', 'calendar', 'routine'];
+        if (arr.length === 4 && all.every(id => set.has(id))) {
+          return arr;
+        }
+        return defaultOrder;
+      } catch {
+        return defaultOrder;
+      }
+    }
+
+    function saveColOrder(order) {
+      localStorage.setItem(COL_ORDER_KEY, JSON.stringify(order));
+    }
+
+    function applyColOrder(order) {
+      columnCards.forEach(card => {
+        const id = card.dataset.colId;
+        const idx = order.indexOf(id);
+        card.style.order = (idx === -1) ? 99 : idx;
+      });
+    }
+
+    function syncColOrderSelects(order) {
+      if (!colOrderSelects.every(Boolean)) return;
+      colOrderSelects.forEach((sel, idx) => {
+        sel.value = order[idx];
+      });
+    }
+
+    let currentColOrder = loadColOrder();
+    applyColOrder(currentColOrder);
+    syncColOrderSelects(currentColOrder);
+
+    if (colOrderSelects.every(Boolean)) {
+      colOrderSelects.forEach((sel, idx) => {
+        sel.addEventListener('change', () => {
+          const newId = sel.value;
+          const oldId = currentColOrder[idx];
+
+          if (newId === oldId) return;
+
+          const otherIdx = currentColOrder.indexOf(newId);
+          if (otherIdx !== -1) {
+            currentColOrder[otherIdx] = oldId;
+          }
+          currentColOrder[idx] = newId;
+
+          saveColOrder(currentColOrder);
+          applyColOrder(currentColOrder);
+          syncColOrderSelects(currentColOrder);
+        });
+      });
+    }
+
+    // ===== 背景（動画ファイル） =====
+    const bgVideo = document.getElementById('bgVideo');
+    const bgVideoInput = document.getElementById('bgVideoInput');
+
+    if (bgVideo && bgVideoInput) {
+      bgVideo.muted = true;
+      bgVideo.autoplay = true;
+      bgVideo.loop = true;
+      bgVideo.playsInline = true;
+
+      bgVideoInput.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const url = URL.createObjectURL(file);
+        console.log('背景動画ファイル:', file, url);
+
+        bgVideo.src = url;
+        bgVideo.load();
+
+        bgVideo.play().catch(err => {
+          console.warn('背景動画の再生に失敗:', err);
+        });
+      });
+    }
+
+    // ===== ポモドーロタイマー =====
+    let timerInterval = null;
+    let remainingSeconds = 25 * 60;
+    let isFocusMode = true;
+    let sessionStartTime = null;
+
+    const timerDisplay = document.getElementById('timerDisplay');
+    const timerMode = document.getElementById('timerMode');
+
+    function updateTimerDisplay() {
+      const m = Math.floor(remainingSeconds / 60);
+      const s = remainingSeconds % 60;
+      timerDisplay.textContent =
+        `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function setMode(focus) {
+      isFocusMode = focus;
+      const focusMin = parseInt(document.getElementById('focusMinutes').value || '25', 10);
+      const breakMin = parseInt(document.getElementById('breakMinutes').value || '5', 10);
+      remainingSeconds = (focus ? focusMin : breakMin) * 60;
+      timerMode.textContent = focus ? 'モード: 集中' : 'モード: 休憩';
+      document.getElementById('switchModeBtn').textContent = focus ? '休憩に切替' : '集中に切替';
+      sessionStartTime = null;
+      updateTimerDisplay();
+
+      // ★ 画面エフェクト用のクラス切り替え
+      document.body.classList.toggle('focus-mode', focus);
+      document.body.classList.toggle('break-mode', !focus);
+    }
+
+    function startTimer() {
+      if (timerInterval) return;
+      if (!sessionStartTime) sessionStartTime = new Date();
+      timerInterval = setInterval(() => {
+        remainingSeconds--;
+        if (remainingSeconds <= 0) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+          remainingSeconds = 0;
+          updateTimerDisplay();
+          handleSessionEnd(true); // 自動終了
+        } else {
+          updateTimerDisplay();
+        }
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      if (!timerInterval) return;
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+
+    function resetTimer() {
+      pauseTimer();
+      setMode(isFocusMode);
+    }
+
+    document.getElementById('startBtn').addEventListener('click', startTimer);
+    document.getElementById('pauseBtn').addEventListener('click', pauseTimer);
+    document.getElementById('resetBtn').addEventListener('click', resetTimer);
+    document.getElementById('switchModeBtn').addEventListener('click', () => {
+      setMode(!isFocusMode);
+    });
+
+    // 途中終了ボタン
+    document.getElementById('finishNowBtn').addEventListener('click', () => {
+      if (!sessionStartTime) {
+        return;
+      }
+      pauseTimer();
+      remainingSeconds = 0;
+      updateTimerDisplay();
+      handleSessionEnd(false); // 手動終了
+    });
+
+    setMode(true); // 初期は集中
+
+    // ===== セッションログ =====
+    const SESSION_KEY = 'focusSessions';
+    const sessionLogEl = document.getElementById('sessionLog');
+    const logModalBackdrop = document.getElementById('logModalBackdrop');
+    const logModalTitle = document.getElementById('logModalTitle');
+    const logNoteInput = document.getElementById('logNoteInput');
+    const logSaveBtn = document.getElementById('logSaveBtn');
+    const logCancelBtn = document.getElementById('logCancelBtn');
+    let pendingSessionData = null;
+    // ★ アーカイブ表示用
+    const sessionArchiveEl = document.getElementById('sessionArchive');
+    const toggleSessionArchiveBtn = document.getElementById('toggleSessionArchive');
+    let showSessionArchive = false;
+
+    if (toggleSessionArchiveBtn && sessionArchiveEl) {
+      toggleSessionArchiveBtn.addEventListener('click', () => {
+        showSessionArchive = !showSessionArchive;
+        sessionArchiveEl.style.display = showSessionArchive ? 'block' : 'none';
+        toggleSessionArchiveBtn.textContent = showSessionArchive
+          ? '📚 アーカイブを隠す'
+          : '📚 アーカイブを見る';
+        renderSessions();
+      });
+    }
+
+    function openLogModal(sessionData) {
+      pendingSessionData = sessionData;
+      logModalTitle.textContent = `「${sessionData.modeLabel}」セッション終了`;
+      logNoteInput.value = '';
+      logModalBackdrop.style.display = 'flex';
+      logNoteInput.focus();
+    }
+
+    function closeLogModal() {
+      logModalBackdrop.style.display = 'none';
+      pendingSessionData = null;
+    }
+
+    function loadSessions() {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) return [];
+      try {
+        const arr = JSON.parse(raw);
+        return arr.map((s, index) => ({
+          date: s.date,
+          time: s.time,
+          mode: s.mode,
+          duration: s.duration,
+          note: s.note || '',
+          archived: !!s.archived,
+          id: s.id ?? `session-${index}-${s.date}-${s.time}`
+        }));
+      } catch {
+        return [];
+      }
+    }
+
+    function saveSessions(sessions) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(sessions));
+    }
+
+    function renderSessions() {
+      const sessions = loadSessions();
+      const today = new Date();
+      const dateStr = today.toISOString().slice(0,10);
+
+      const todays = sessions.filter(s => s.date === dateStr && !s.archived);
+
+      if (!todays.length) {
+        sessionLogEl.innerHTML = '<div class="small">今日のログはまだありません。</div>';
+      } else {
+        sessionLogEl.innerHTML = todays.map(s => `
+          <div class="session-item" data-id="${s.id}">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+              <div>
+                <div>[${s.mode}] ${s.duration} 分</div>
+                <div>${s.note ? s.note : '(ノートなし)'}</div>
+                <div class="small">${s.date} ${s.time}</div>
+              </div>
+              <div style="display:flex; gap:4px;">
+                <button class="secondary small-btn" data-action="archive-session" data-id="${s.id}" title="アーカイブ">
+                  📦
+                </button>
+                <button class="secondary small-btn" data-action="delete-session" data-id="${s.id}" title="削除">
+                  🗑️
+                </button>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // ★ アーカイブされた全ログ（日付でスタック）
+      if (sessionArchiveEl) {
+        if (!showSessionArchive) {
+          sessionArchiveEl.innerHTML = '';
+          return;
+        }
+
+        const archived = sessions.filter(s => s.archived);
+        if (!archived.length) {
+          sessionArchiveEl.innerHTML = '<div class="small">アーカイブされたログはまだありません。</div>';
+        } else {
+          const byDate = {};
+          archived.forEach(s => {
+            const d = s.date || 'unknown';
+            if (!byDate[d]) byDate[d] = [];
+            byDate[d].push(s);
+          });
+
+          const dates = Object.keys(byDate).sort((a,b) => (a < b ? 1 : -1));
+
+          sessionArchiveEl.innerHTML = dates.map(d => {
+            const items = byDate[d].sort((a,b) => (a.time || '').localeCompare(b.time || ''));
+            const inner = items.map(s => `
+              <div class="session-item" data-id="${s.id}">
+                <div style="display:flex; justify-content:space-between; gap:8px; align-items:flex-start;">
+                  <div style="flex:1;">
+                    <div>[${s.mode}] ${s.duration} 分</div>
+                    <div>${s.note ? s.note : '(ノートなし)'}</div>
+                    <div class="small">${s.time || ''}</div>
+                  </div>
+                  <button class="secondary small-btn" data-action="delete-session" data-id="${s.id}" title="削除">🗑️</button>
+                </div>
+              </div>
+            `).join('');
+
+            return `
+              <div style="margin:10px 0 6px; font-weight:600;">📅 ${d}</div>
+              ${inner}
+            `;
+          }).join('');
+        }
+      }
+    }
+
+    function handleSessionEnd(autoSwitch = true) {
+      const modeLabel = isFocusMode ? '集中' : '休憩';
+      const focusMin = parseInt(document.getElementById('focusMinutes').value || '25', 10);
+      const breakMin = parseInt(document.getElementById('breakMinutes').value || '5', 10);
+      const now = new Date();
+
+      let durationMin;
+      if (sessionStartTime) {
+        durationMin = Math.max(1, Math.round((now - sessionStartTime) / 60000));
+      } else {
+        durationMin = isFocusMode ? focusMin : breakMin;
+      }
+      sessionStartTime = null;
+
+      const dateStr = now.toISOString().slice(0,10);
+      const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      const id = `session-${now.getTime()}`;
+
+      // ★ タイマー終了時の通知（モーダルを開く前に通知）
+      notifyTimerFinished(modeLabel);
+
+      openLogModal({
+        modeLabel,
+        durationMin,
+        dateStr,
+        timeStr,
+        id,
+        autoSwitch
+      });
+    }
+
+    renderSessions();
+
+    logSaveBtn.addEventListener('click', () => {
+      if (!pendingSessionData) {
+        closeLogModal();
+        return;
+      }
+      const note = logNoteInput.value.trim();
+      const sessions = loadSessions();
+      sessions.push({
+        date: pendingSessionData.dateStr,
+        time: pendingSessionData.timeStr,
+        mode: pendingSessionData.modeLabel,
+        duration: pendingSessionData.durationMin,
+        note,
+        archived: false,
+        id: pendingSessionData.id
+      });
+      saveSessions(sessions);
+      renderSessions();
+
+      if (pendingSessionData.autoSwitch) {
+        setMode(!isFocusMode);
+      }
+      alert(`${pendingSessionData.modeLabel}セッションが終了しました！`);
+      closeLogModal();
+    });
+
+    logCancelBtn.addEventListener('click', () => {
+      closeLogModal();
+    });
+
+    logModalBackdrop.addEventListener('click', (e) => {
+      if (e.target === logModalBackdrop) {
+        closeLogModal();
+      }
+    });
+
+    function handleSessionButtonsClick(e) {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+
+      const action = btn.dataset.action;
+      const id = btn.dataset.id;
+
+      const sessions = loadSessions();
+      const target = sessions.find(s => s.id === id);
+      if (!target) return;
+
+      if (action === 'archive-session') {
+        target.archived = true;
+      } else if (action === 'delete-session') {
+        const idx = sessions.findIndex(s => s.id === id);
+        if (idx !== -1) sessions.splice(idx, 1);
+      }
+      saveSessions(sessions);
+      renderSessions();
+    }
+
+    sessionLogEl.addEventListener('click', handleSessionButtonsClick);
+    if (sessionArchiveEl) sessionArchiveEl.addEventListener('click', handleSessionButtonsClick);
+
+    // ===== TODOリスト =====
+    const TODO_KEY = 'todayTodos';
+    const todoInput = document.getElementById('todoInput');
+    const todoListEl = document.getElementById('todoList');
+    let draggingId = null;
+    // ★ タスクのアーカイブ表示用
+    const todoArchiveListEl = document.getElementById('todoArchiveList');
+    const toggleTodoArchiveBtn = document.getElementById('toggleTodoArchive');
+    let showTodoArchive = false;
+
+    if (toggleTodoArchiveBtn && todoArchiveListEl) {
+      toggleTodoArchiveBtn.addEventListener('click', () => {
+        showTodoArchive = !showTodoArchive;
+        todoArchiveListEl.style.display = showTodoArchive ? 'block' : 'none';
+        toggleTodoArchiveBtn.textContent = showTodoArchive
+          ? '📚 アーカイブを隠す'
+          : '📚 アーカイブされたタスクを見る';
+        renderTodos();
+      });
+    }
+
+    function loadTodos() {
+      const raw = localStorage.getItem(TODO_KEY);
+      if (!raw) return [];
+      try {
+        const arr = JSON.parse(raw);
+        return arr.map((t, index) => ({
+          text: t.text ?? '',
+          done: !!t.done,
+          archived: !!t.archived,
+          date: t.date ?? new Date().toISOString().slice(0,10),
+          id: t.id ?? `todo-${index}-${Date.now()}`
+        }));
+      } catch {
+        return [];
+      }
+    }
+
+    function saveTodos(todos) {
+      localStorage.setItem(TODO_KEY, JSON.stringify(todos));
+    }
+
+    function renderTodos() {
+      const allTodos = loadTodos();
+      const todos = allTodos.filter(t => !t.archived);
+
+      if (!todos.length) {
+        todoListEl.innerHTML = '<div class="small">今日のタスクはまだありません。</div>';
+      } else {
+        todoListEl.innerHTML = todos.map(t => `
+          <div class="todo-item ${t.done ? 'completed' : ''}" 
+               draggable="true"
+               data-id="${t.id}">
+            <div style="display:flex; align-items:center; gap:6px; flex:1;">
+              <input type="checkbox" data-action="toggle-done" data-id="${t.id}" ${t.done ? 'checked' : ''} />
+              <span>${t.text}</span>
+            </div>
+            <div style="display:flex; gap:4px;">
+              <button class="secondary small-btn" data-action="archive" data-id="${t.id}" title="アーカイブ">
+                📦
+              </button>
+              <button class="secondary small-btn" data-action="delete" data-id="${t.id}" title="削除">
+                🗑️
+              </button>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // ★ アーカイブされたタスク一覧（日付でスタック）
+      if (todoArchiveListEl) {
+        if (!showTodoArchive) {
+          todoArchiveListEl.innerHTML = '';
+          return;
+        }
+
+        const archived = allTodos.filter(t => t.archived);
+        if (!archived.length) {
+          todoArchiveListEl.innerHTML = '<div class="small">アーカイブされたタスクはまだありません。</div>';
+        } else {
+          const byDate = {};
+          archived.forEach(t => {
+            const d = t.date || 'unknown';
+            if (!byDate[d]) byDate[d] = [];
+            byDate[d].push(t);
+          });
+
+          const dates = Object.keys(byDate).sort((a,b) => (a < b ? 1 : -1));
+
+          todoArchiveListEl.innerHTML = dates.map(d => {
+            const items = byDate[d];
+            const inner = items.map(t => `
+              <div class="todo-item completed" data-id="${t.id}">
+                <div style="display:flex; justify-content:space-between; gap:8px; align-items:flex-start; width:100%;">
+                  <div class="small" style="flex:1;">・${t.text}</div>
+                  <button class="secondary small-btn" data-action="delete" data-id="${t.id}" title="削除">🗑️</button>
+                </div>
+              </div>
+            `).join('');
+
+            return `
+              <div style="margin:10px 0 6px; font-weight:600;">📅 ${d}</div>
+              ${inner}
+            `;
+          }).join('');
+        }
+      }
+    }
+
+    document.getElementById('addTodoBtn').addEventListener('click', () => {
+      const text = todoInput.value.trim();
+      if (!text) return;
+      const todos = loadTodos();
+      const now = new Date();
+      const dateStr = now.toISOString().slice(0,10);
+      todos.push({ text, done: false, archived: false, id: `todo-${Date.now()}`, date: dateStr });
+      saveTodos(todos);
+      todoInput.value = '';
+      renderTodos();
+    });
+
+    todoListEl.addEventListener('change', (e) => {
+      if (e.target.matches('input[type="checkbox"][data-action="toggle-done"]')) {
+        const id = e.target.dataset.id;
+        const todos = loadTodos();
+        const target = todos.find(t => t.id === id);
+        if (target) {
+          target.done = e.target.checked;
+          saveTodos(todos);
+          renderTodos();
+        }
+      }
+    });
+
+    todoListEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const id = btn.dataset.id;
+      const todos = loadTodos();
+      const target = todos.find(t => t.id === id);
+      if (!target) return;
+
+      if (action === 'archive') {
+        target.archived = true;
+      } else if (action === 'delete') {
+        const idx = todos.findIndex(t => t.id === id);
+        if (idx !== -1) todos.splice(idx, 1);
+      }
+      saveTodos(todos);
+      renderTodos();
+    });
+
+    if (todoArchiveListEl) {
+      todoArchiveListEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+
+        const action = btn.dataset.action;
+        const id = btn.dataset.id;
+
+        const todos = loadTodos();
+        const idx = todos.findIndex(t => t.id === id);
+        if (idx === -1) return;
+
+        if (action === 'delete') {
+          todos.splice(idx, 1);
+          saveTodos(todos);
+          renderTodos();
+        }
+      });
+    }
+    todoListEl.addEventListener('dragstart', (e) => {
+      const item = e.target.closest('.todo-item');
+      if (!item) return;
+      draggingId = item.dataset.id;
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    todoListEl.addEventListener('dragover', (e) => {
+      e.preventDefault();
+    });
+
+    todoListEl.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const targetItem = e.target.closest('.todo-item');
+      if (!targetItem || !draggingId) return;
+      const targetId = targetItem.dataset.id;
+      if (targetId === draggingId) return;
+
+      const todos = loadTodos();
+      const fromIndex = todos.findIndex(t => t.id === draggingId);
+      const toIndex = todos.findIndex(t => t.id === targetId);
+      if (fromIndex === -1 || toIndex === -1) return;
+
+      const [moved] = todos.splice(fromIndex, 1);
+      todos.splice(toIndex, 0, moved);
+      saveTodos(todos);
+      renderTodos();
+      draggingId = null;
+    });
+
+    todoListEl.addEventListener('dragend', () => {
+      draggingId = null;
+    });
+
+    renderTodos();
+
+    // ===== JSON バックアップ / 復元 =====
+    const exportJsonBtn = document.getElementById('exportJsonBtn');
+    const importJsonBtn = document.getElementById('importJsonBtn');
+    const importJsonInput = document.getElementById('importJsonInput');
+
+    function exportAppData() {
+      const data = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        todos: loadTodos(),
+        sessions: loadSessions(),
+        routines: loadRoutines(),
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `today-focus-room-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function importAppData(file) {
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+
+        if (data.todos) {
+          localStorage.setItem(TODO_KEY, JSON.stringify(data.todos));
+        }
+        if (data.sessions) {
+          localStorage.setItem(SESSION_KEY, JSON.stringify(data.sessions));
+        }
+        if (data.routines) {
+          localStorage.setItem(ROUTINE_KEY, JSON.stringify(data.routines));
+        }
+
+        renderTodos();
+        renderSessions();
+        renderRoutines();
+
+        alert('データを読み込みました！');
+      } catch (e) {
+        console.error(e);
+        alert('JSONの読み込みに失敗しました…ファイルを確認してください。');
+      }
+    }
+
+    if (exportJsonBtn) {
+      exportJsonBtn.addEventListener('click', exportAppData);
+    }
+
+    if (importJsonBtn && importJsonInput) {
+      importJsonBtn.addEventListener('click', () => {
+        importJsonInput.click();
+      });
+
+      importJsonInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        importAppData(file);
+        importJsonInput.value = '';
+      });
+    }
+
+    // ===== ルーティーン（1日カレンダービュー＋ドラッグ編集＋通知） =====
+    const ROUTINE_KEY        = 'tfr-routines';
+    const ROUTINE_NOTIFY_KEY = 'tfr-routine-notify';
+
+    const routineStartInput = document.getElementById('routineStartInput');
+    const routineEndInput   = document.getElementById('routineEndInput');
+    const routineLabelInput = document.getElementById('routineLabelInput');
+    const addRoutineBtn     = document.getElementById('addRoutineBtn');
+    const routineEvents     = document.getElementById('routineEvents');
+    const routineNowLine    = document.getElementById('routineNowLine');
+    let routineEditTargetId = null;
+
+    const routineEditPopup      = document.getElementById('routineEditPopup');
+    const routinePopupLabel     = document.getElementById('routinePopupLabel');
+    const routinePopupStart     = document.getElementById('routinePopupStart');
+    const routinePopupEnd       = document.getElementById('routinePopupEnd');
+    const routinePopupSave      = document.getElementById('routinePopupSave');
+    const routinePopupCancel    = document.getElementById('routinePopupCancel');
+    const routinePopupDelete    = document.getElementById('routinePopupDelete');
+
+    function loadRoutines() {
+      const raw = localStorage.getItem(ROUTINE_KEY);
+      if (!raw) return [];
+      try {
+        const arr = JSON.parse(raw);
+        return arr.map((r, index) => ({
+          id     : r.id ?? `routine-${index}-${r.start ?? r.time ?? ''}`,
+          start  : r.start ?? r.time ?? '',
+          end    : r.end ?? '',
+          label  : r.label ?? '',
+          enabled: r.enabled ?? true,
+        }));
+      } catch {
+        return [];
+      }
+    }
+
+    function saveRoutines(routines) {
+      localStorage.setItem(ROUTINE_KEY, JSON.stringify(routines));
+    }
+
+    function colorFromString(str) {
+      const palette = ['#ff9e9e', '#ffd27f', '#8fd3ff', '#b58cff', '#9de39d', '#ffb3ff'];
+      let h = 0;
+      for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+      return palette[h % palette.length];
+    }
+
+    function openRoutinePopup(r, blockElement) {
+      routineEditTargetId = r.id;
+      routinePopupLabel.value = r.label || '';
+      routinePopupStart.value = r.start || '';
+      routinePopupEnd.value   = r.end   || '';
+
+      const rect = blockElement.getBoundingClientRect();
+      const popupRect = { width: 260, height: 140 };
+
+      let left = rect.right + 8;
+      let top  = rect.top;
+
+      if (left + popupRect.width > window.innerWidth - 8) {
+        left = rect.left - popupRect.width - 8;
+      }
+      if (top + popupRect.height > window.innerHeight - 8) {
+        top = window.innerHeight - popupRect.height - 8;
+      }
+
+      routineEditPopup.style.left = `${left}px`;
+      routineEditPopup.style.top  = `${top}px`;
+      routineEditPopup.style.display = 'block';
+    }
+
+    function closeRoutinePopup() {
+      routineEditTargetId = null;
+      if (routineEditPopup) {
+        routineEditPopup.style.display = 'none';
+      }
+    }
+
+    function timeStringToMinutes(str) {
+      if (!str || !str.includes(':')) return null;
+      const [h, m] = str.split(':').map(Number);
+      if (Number.isNaN(h) || Number.isNaN(m)) return null;
+      return h * 60 + m;
+    }
+
+    function minutesToTimeString(mins) {
+      mins = Math.max(0, Math.min(24 * 60 - 1, mins));
+      const h = String(Math.floor(mins / 60)).padStart(2, '0');
+      const m = String(mins % 60).padStart(2, '0');
+      return `${h}:${m}`;
+    }
+
+    function renderRoutines() {
+      if (!routineEvents) return;
+      const routines = loadRoutines().sort((a, b) => {
+        if (a.start < b.start) return -1;
+        if (a.start > b.start) return 1;
+        return 0;
+      });
+
+      const children = Array.from(routineEvents.children);
+      children.forEach(ch => {
+        if (ch !== routineNowLine) ch.remove();
+      });
+
+      if (!routines.length) {
+        const guide = document.createElement('div');
+        guide.className = 'small';
+        guide.style.position = 'absolute';
+        guide.style.left = '10px';
+        guide.style.top  = '10px';
+        guide.textContent = '右下のフォームからルーティーンを追加できます。';
+        routineEvents.appendChild(guide);
+        return;
+      }
+
+      const total = 24 * 60;
+      const now   = new Date();
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+
+      let closestId   = null;
+      let closestDiff = Infinity;
+
+      // どのブロックが「今に一番近いか」を先に計算
+      routines.forEach(r => {
+        const s = timeStringToMinutes(r.start);
+        let e   = timeStringToMinutes(r.end);
+        if (s == null) return;
+        if (e == null || e <= s) e = s + 30;
+        if (e > total) e = total;
+
+        let diff;
+        if (nowMin < s) diff = s - nowMin;
+        else if (nowMin > e) diff = nowMin - e;
+        else diff = 0;
+
+        if (diff < closestDiff) {
+          closestDiff = diff;
+          closestId   = r.id;
+        }
+      });
+
+      routines.forEach(r => {
+        const startMin = timeStringToMinutes(r.start);
+        let endMin     = timeStringToMinutes(r.end);
+        if (startMin == null) return;
+        if (endMin == null || endMin <= startMin) endMin = startMin + 30;
+        if (endMin > total) endMin = total;
+
+        const topPercent    = (startMin / total) * 100;
+        const heightPercent = ((endMin - startMin) / total) * 100;
+
+        const block = document.createElement('div');
+        block.className = 'routine-block';
+        if (r.id === closestId) {
+          block.classList.add('current');
+        }
+        block.dataset.id   = r.id;
+        block.style.top    = `${topPercent}%`;
+        block.style.height = `${Math.max(heightPercent, (30 / total) * 100)}%`;
+
+        const accent = colorFromString(r.label || r.id || '');
+        block.style.borderLeftColor = accent;
+
+        const endLabel = r.end || minutesToTimeString(endMin);
+        const label    = r.label || '(無題のルーティーン)';
+
+        block.innerHTML = `
+          <div class="routine-resize-handle routine-resize-top" data-id="${r.id}"></div>
+          <div class="routine-block-body" data-id="${r.id}">
+            <div class="routine-drag-handle" data-id="${r.id}"></div>
+            <div class="routine-block-time">${r.start || '--:--'}〜${endLabel}</div>
+            <div class="routine-block-label">${label}</div>
+          </div>
+          <div class="routine-resize-handle routine-resize-bottom" data-id="${r.id}"></div>
+        `;
+        routineEvents.appendChild(block);
+      });
+    }
+
+    // ルーティーン追加ボタン
+    if (addRoutineBtn) {
+      addRoutineBtn.addEventListener('click', () => {
+        const start = (routineStartInput.value || '').trim();
+        const endRaw = (routineEndInput.value || '').trim();
+        const label  = (routineLabelInput.value || '').trim();
+
+        if (!start) {
+          alert('開始時間を指定してください');
+          return;
+        }
+
+        let end  = endRaw;
+        const sMin = timeStringToMinutes(start);
+        let eMin = timeStringToMinutes(end);
+
+        if (sMin != null) {
+          if (eMin == null || eMin <= sMin) {
+            eMin = sMin + 30;
+            end  = minutesToTimeString(eMin);
+          }
+        }
+
+        const routines = loadRoutines();
+        const id = `routine-${Date.now()}`;
+        routines.push({ id, start, end, label, enabled: true });
+        saveRoutines(routines);
+        renderRoutines();
+
+        routineLabelInput.value = '';
+      });
+    }
+
+    // ドラッグ関連
+    let routineDrag      = null;
+    let routineDragMoved = false;
+
+    if (routineEvents) {
+      routineEvents.addEventListener('mousedown', (e) => {
+        // ★ 左クリック以外（右クリック・中クリック）はドラッグ処理しない
+        if (e.button !== 0) return;
+        const topHandle    = e.target.closest('.routine-resize-top');
+        const bottomHandle = e.target.closest('.routine-resize-bottom');
+        const dragHandle   = e.target.closest('.routine-drag-handle');
+        const block        = e.target.closest('.routine-block');
+
+        if (!block) return;
+        const id = block.dataset.id;
+
+        const routines = loadRoutines();
+        const r = routines.find(x => x.id === id);
+        if (!r || !r.start) return;
+
+        const rect = routineEvents.getBoundingClientRect();
+        const s = timeStringToMinutes(r.start);
+        let eMin = timeStringToMinutes(r.end);
+        if (s == null) return;
+        if (eMin == null || eMin <= s) eMin = s + 30;
+
+        const dragMode = topHandle
+          ? 'resizeTop'
+          : bottomHandle
+          ? 'resizeBottom'
+          : dragHandle
+          ? 'move'
+          : null;
+
+        if (!dragMode) return;
+
+        routineDrag = {
+          id,
+          mode: dragMode,     // 'move' | 'resizeTop' | 'resizeBottom'
+          startClientY: e.clientY,
+          startMinutes: s,
+          endMinutes: eMin,
+          containerHeight: rect.height,
+        };
+        routineDragMoved = false;
+        e.preventDefault();
+      });
+    }
+
+    document.addEventListener('mousemove', (e) => {
+      if (!routineDrag || !routineEvents) return;
+
+      const total = 24 * 60;
+      const dy = e.clientY - routineDrag.startClientY;
+      const deltaMinutes = (dy / routineDrag.containerHeight) * total;
+
+      let newStart = routineDrag.startMinutes;
+      let newEnd   = routineDrag.endMinutes;
+
+      if (Math.abs(dy) > 3) {
+        routineDragMoved = true; // 少しでも動いたら「ドラッグ扱い」
+      }
+
+      if (routineDrag.mode === 'move') {
+        const length = newEnd - newStart;
+        newStart = routineDrag.startMinutes + deltaMinutes;
+        newEnd   = routineDrag.endMinutes + deltaMinutes;
+
+        if (newStart < 0) {
+          newStart = 0;
+          newEnd   = length;
+        }
+        if (newEnd > total) {
+          newEnd   = total;
+          newStart = total - length;
+        }
+      } else if (routineDrag.mode === 'resizeTop') {
+        newStart = routineDrag.startMinutes + deltaMinutes;
+        if (newStart < 0) newStart = 0;
+        if (newStart >= newEnd - 10) newStart = newEnd - 10; // 最短10分
+      } else if (routineDrag.mode === 'resizeBottom') {
+        newEnd = routineDrag.endMinutes + deltaMinutes;
+        if (newEnd > total) newEnd = total;
+        if (newEnd <= newStart + 10) newEnd = newStart + 10;
+      }
+
+      newStart = Math.round(newStart / 5) * 5;
+      newEnd   = Math.round(newEnd   / 5) * 5;
+
+      const topPercent    = (newStart / total) * 100;
+      const heightPercent = ((newEnd - newStart) / total) * 100;
+
+      const block = routineEvents.querySelector(`.routine-block[data-id="${routineDrag.id}"]`);
+      if (block) {
+        block.style.top    = `${topPercent}%`;
+        block.style.height = `${heightPercent}%`;
+        const timeEl = block.querySelector('.routine-block-time');
+        if (timeEl) {
+          timeEl.textContent = `${minutesToTimeString(newStart)}〜${minutesToTimeString(newEnd)}`;
+        }
+      }
+    });
+
+    document.addEventListener('mouseup', (e) => {
+      if (!routineDrag) return;
+
+      const total = 24 * 60;
+      const dy = e.clientY - routineDrag.startClientY;
+      const deltaMinutes = (dy / routineDrag.containerHeight) * total;
+
+      let newStart = routineDrag.startMinutes;
+      let newEnd   = routineDrag.endMinutes;
+
+      if (routineDrag.mode === 'move') {
+        const length = newEnd - newStart;
+        newStart = routineDrag.startMinutes + deltaMinutes;
+        newEnd   = routineDrag.endMinutes + deltaMinutes;
+
+        if (newStart < 0) {
+          newStart = 0;
+          newEnd   = length;
+        }
+        if (newEnd > total) {
+          newEnd   = total;
+          newStart = total - length;
+        }
+      } else if (routineDrag.mode === 'resizeTop') {
+        newStart = routineDrag.startMinutes + deltaMinutes;
+        if (newStart < 0) newStart = 0;
+        if (newStart >= newEnd - 10) newStart = newEnd - 10;
+      } else if (routineDrag.mode === 'resizeBottom') {
+        newEnd = routineDrag.endMinutes + deltaMinutes;
+        if (newEnd > total) newEnd = total;
+        if (newEnd <= newStart + 10) newEnd = newStart + 10;
+      }
+
+      newStart = Math.round(newStart / 5) * 5;
+      newEnd   = Math.round(newEnd   / 5) * 5;
+
+      const routines = loadRoutines();
+      const r = routines.find(x => x.id === routineDrag.id);
+      if (r) {
+        r.start = minutesToTimeString(newStart);
+        r.end   = minutesToTimeString(newEnd);
+        saveRoutines(routines);
+      }
+
+      routineDrag = null;
+      renderRoutines();
+    });
+
+    if (routineEvents) {
+      // ダブルクリックで編集ポップアップ
+      routineEvents.addEventListener('dblclick', (e) => {
+        const block = e.target.closest('.routine-block');
+        if (!block) return;
+
+        const id = block.dataset.id;
+        const routines = loadRoutines();
+        const r = routines.find(x => x.id === id);
+        if (!r) return;
+
+        openRoutinePopup(r, block);
+      });
+    }
+
+    if (routinePopupCancel) {
+      routinePopupCancel.addEventListener('click', () => {
+        closeRoutinePopup();
+      });
+    }
+
+    if (routinePopupDelete) {
+      routinePopupDelete.addEventListener('click', () => {
+        if (!routineEditTargetId) return;
+        const routines = loadRoutines();
+        const idx = routines.findIndex(x => x.id === routineEditTargetId);
+        if (idx !== -1) {
+          routines.splice(idx, 1);
+          saveRoutines(routines);
+          renderRoutines();
+        }
+        closeRoutinePopup();
+      });
+    }
+
+    if (routinePopupSave) {
+      routinePopupSave.addEventListener('click', () => {
+        if (!routineEditTargetId) return;
+        const routines = loadRoutines();
+        const r = routines.find(x => x.id === routineEditTargetId);
+        if (!r) return;
+
+        const newLabel = (routinePopupLabel.value || '').trim();
+        const newStart = (routinePopupStart.value || '').trim();
+        const newEnd   = (routinePopupEnd.value || '').trim();
+
+        if (!newStart) {
+          alert('開始時間は必須です');
+          return;
+        }
+
+        r.label = newLabel;
+        r.start = newStart;
+
+        const sMin = timeStringToMinutes(r.start);
+        let eMin   = timeStringToMinutes(newEnd);
+        if (sMin != null) {
+          if (eMin == null || eMin <= sMin) {
+            eMin = sMin + 30;
+          }
+          r.end = minutesToTimeString(eMin);
+        }
+
+        saveRoutines(routines);
+        renderRoutines();
+        closeRoutinePopup();
+      });
+    }
+
+    // ポップアップ外クリックで閉じる
+    document.addEventListener('click', (e) => {
+      if (!routineEditPopup || routineEditPopup.style.display !== 'block') return;
+      if (e.target.closest('#routineEditPopup')) return;
+      closeRoutinePopup();
+    });
+
+    // ESCキーで閉じる
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeRoutinePopup();
+      }
+    });
+
+    function updateRoutineNowMarker() {
+      if (!routineNowLine || !routineEvents) return;
+      const now     = new Date();
+      const minutes = now.getHours() * 60 + now.getMinutes();
+      const percent = (minutes / (24 * 60)) * 100;
+      routineNowLine.style.top = `${percent}%`;
+    }
+
+    function updateGcalNowMarker() {
+      const gcalNowLine = document.getElementById('gcalNowLine');
+      if (!gcalNowLine) return;
+
+      const now = new Date();
+      const minutes = now.getHours() * 60 + now.getMinutes();
+      const percent = (minutes / (24 * 60)) * 100;
+
+      gcalNowLine.style.top = `${percent}%`;
+    }
+
+    renderRoutines();
+    updateRoutineNowMarker();
+    updateGcalNowMarker();
+    setInterval(updateRoutineNowMarker, 60 * 1000);
+    setInterval(updateGcalNowMarker, 60 * 1000);
+
+    // ===== 通知まわり =====
+    function loadRoutineNotifyState() {
+      const raw = localStorage.getItem(ROUTINE_NOTIFY_KEY);
+      if (!raw) return {};
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return {};
+      }
+    }
+
+    function saveRoutineNotifyState(state) {
+      localStorage.setItem(ROUTINE_NOTIFY_KEY, JSON.stringify(state));
+    }
+
+    // ★ 音を解錠（初回操作でサイレント再生）
+    let audioUnlocked = false;
+    async function unlockAudio() {
+      if (audioUnlocked) return true;
+      const sound = document.getElementById('notifySound');
+      if (!sound) return false;
+      try {
+        sound.volume = 0;
+        sound.muted = true;
+        sound.currentTime = 0;
+        await sound.play();
+        sound.pause();
+        sound.currentTime = 0;
+        sound.muted = false;
+        sound.volume = 1.0;
+        audioUnlocked = true;
+        return true;
+      } catch (e) {
+        console.warn('音の解錠に失敗:', e);
+        return false;
+      }
+    }
+
+    // ★ 音を鳴らす（自動再生ブロック対策つき）
+    async function playNotifySound() {
+      const sound = document.getElementById('notifySound');
+      if (!sound) return false;
+
+      try {
+        sound.volume = 1.0;
+        sound.currentTime = 0;
+        sound.load();
+        await sound.play();
+        return true;
+      } catch (e) {
+        console.warn('音がブロックされました:', e);
+        return false;
+      }
+    }
+
+    function showNotification(title, message) {
+      const container = document.getElementById('notificationContainer');
+      if (!container) return;
+
+      const el = document.createElement('div');
+      el.className = 'notification';
+      el.innerHTML = `
+        <div class="notification-title">${title}</div>
+        <div class="notification-body">${message}</div>
+      `;
+      container.appendChild(el);
+
+      requestAnimationFrame(() => {
+        el.classList.add('show');
+      });
+
+      playNotifySound();
+
+      setTimeout(() => {
+        el.classList.remove('show');
+        setTimeout(() => {
+          el.remove();
+        }, 300);
+      }, 5000);
+    }
+
+    function notifyTimerFinished(modeLabel) {
+      // 右下通知
+      showNotification(
+        "⏰ タイマー終了",
+        `${modeLabel} が終了しました！`
+      );
+
+      // 音（mp3 or ビープのやつ）
+      if (typeof playNotifySound === "function") {
+        playNotifySound();
+      } else {
+        const sound = document.getElementById("notifySound");
+        if (sound) {
+          sound.currentTime = 0;
+          sound.play().catch(() => {});
+        }
+      }
+    }
+
+    function checkRoutineNotifications() {
+      const routines = loadRoutines();
+      if (!routines.length) return;
+
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10);
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      const currentHM = `${hh}:${mm}`;
+
+      const state = loadRoutineNotifyState();
+
+      routines.forEach(r => {
+        const startTime = r.start || r.time;
+        if (!startTime) return;
+
+        const lastDate = state[r.id];
+        if (lastDate === todayStr) return;
+
+        if (startTime === currentHM) {
+          showNotification(
+            `ルーティーン：${r.label || '(無題)'}`,
+            `${startTime} の時間です。`
+          );
+          state[r.id] = todayStr;
+        }
+      });
+
+      saveRoutineNotifyState(state);
+    }
+
+    setInterval(checkRoutineNotifications, 30 * 1000);
+
+    async function ensureNotificationPermission() {
+      if (!('Notification' in window)) {
+        alert('このブラウザは通知に対応していないみたい…！');
+        return false;
+      }
+
+      if (Notification.permission === 'granted') return true;
+
+      if (Notification.permission === 'denied') {
+        alert('通知がブロックされています。Chromeの「サイトの設定」→「通知」を許可にしてね！');
+        return false;
+      }
+
+      const p = await Notification.requestPermission();
+      return p === 'granted';
+    }
+
+    function showBrowserNotification(title, body) {
+      try {
+        new Notification(title, { body });
+        return true;
+      } catch (e) {
+        console.warn('Notification failed:', e);
+        return false;
+      }
+    }
+
+    const enableNotifyBtn = document.getElementById('enableNotifyBtn');
+    const testNotifyBtn   = document.getElementById('testNotifyBtn');
+
+    async function requestBrowserNotificationPermission() {
+      if (!("Notification" in window)) {
+        alert("このブラウザは通知に対応していません");
+        return "unsupported";
+      }
+
+      const perm = await Notification.requestPermission();
+      console.log("Notification.permission =", perm);
+
+      if (perm !== "granted") {
+        alert("通知が許可されていません（ブラウザ側の設定を確認してね）");
+      } else {
+        showNotification("通知OK", "ブラウザ通知が使えます！");
+      }
+      return perm;
+    }
+
+    function fireBrowserNotification(title, body) {
+      if (!("Notification" in window)) return false;
+      if (Notification.permission !== "granted") return false;
+      new Notification(title, { body });
+      return true;
+    }
+
+    enableNotifyBtn?.addEventListener("click", () => {
+      requestBrowserNotificationPermission();
+    });
+
+    testNotifyBtn?.addEventListener("click", () => {
+      unlockAudio();
+      const ok = fireBrowserNotification("🧪 テスト通知", "ブラウザ通知のテストです！");
+      if (!ok) {
+        showNotification("テスト通知", "ブラウザ通知が出せなかったので右下通知にしました");
+      }
+      playNotifySound();
+    });
+  </script>
+
+  <!-- ===== Google カレンダー連携（複数カレンダー＋色付き） ===== -->
+  <script>
+    const CLIENT_ID = '124493140714-v8nb0get5jk26hb3j07umvi511qlr3uf.apps.googleusercontent.com';
+    const API_KEY = 'AIzaSyDjQ-iqyrxXq-HP3_-jNDTs-OWMEf8XTIw';
+
+    const DISCOVERY_DOCS = [
+      "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"
+    ];
+    const SCOPES = "https://www.googleapis.com/auth/calendar.readonly";
+
+    const authorizeButton = document.getElementById('authorize_button');
+    const signoutButton = document.getElementById('signout_button');
+    const gcalStatus = document.getElementById('gcalStatus');
+    const eventsList = document.getElementById('eventsList');
+    const calendarFilters = document.getElementById('calendarFilters');
+
+    let tokenClient;
+    let gapiInited = false;
+    let gisInited = false;
+
+    let calendarsCache = [];
+    let selectedCalendarIds = [];
+    const calendarColors = {};
+
+    const CAL_SELECTION_KEY = 'gcalSelectedCalendars';
+    const GCAL_AUTH_KEY = 'gcalAuthorized';
+
+    function restoreCalendarSelection() {
+      const raw = localStorage.getItem(CAL_SELECTION_KEY);
+      if (!raw) return;
+      try {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          selectedCalendarIds = arr;
+        }
+      } catch (_) {}
+    }
+
+    function saveCalendarSelection() {
+      localStorage.setItem(CAL_SELECTION_KEY, JSON.stringify(selectedCalendarIds));
+    }
+
+    function gapiLoaded() {
+      console.log('gapi 読み込み完了');
+      gapi.load('client', initGapiClient);
+    }
+
+    async function initGapiClient() {
+      try {
+        await gapi.client.init({
+          apiKey: API_KEY,
+          discoveryDocs: DISCOVERY_DOCS,
+        });
+        console.log('gapi.client.init 完了');
+        gapiInited = true;
+        maybeEnableAuthButton();
+        tryAutoReconnect();
+      } catch (err) {
+        console.error('gapi.client.init エラー:', err);
+        gcalStatus.textContent = 'Googleカレンダー: 初期化エラー';
+      }
+    }
+
+    function gisLoaded() {
+      console.log('GIS 読み込み完了');
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: (tokenResponse) => {
+          console.log('トークン取得完了', tokenResponse);
+          if (tokenResponse.error) {
+            console.error(tokenResponse);
+            return;
+          }
+          localStorage.setItem(GCAL_AUTH_KEY, '1');
+          gcalStatus.textContent = 'Googleカレンダー: 接続済み';
+          authorizeButton.style.display = 'none';
+          signoutButton.style.display = 'inline-block';
+
+          gapi.client.setToken(tokenResponse);
+
+          loadCalendarList().then(() => {
+            listTodayEvents();
+          });
+        },
+      });
+      gisInited = true;
+      maybeEnableAuthButton();
+      tryAutoReconnect();
+    }
+
+    function maybeEnableAuthButton() {
+      if (gapiInited && gisInited) {
+        authorizeButton.disabled = false;
+        tryAutoReconnect();
+      }
+    }
+
+    function tryAutoReconnect() {
+      if (localStorage.getItem(GCAL_AUTH_KEY) && tokenClient && gapiInited && gisInited) {
+        console.log('GCAL auto reconnect');
+        tokenClient.requestAccessToken({ prompt: '' });
+      }
+    }
+
+    async function loadCalendarList() {
+      try {
+        const res = await gapi.client.calendar.calendarList.list();
+        const items = res.result.items || [];
+        const palette = ['#ff9e9e', '#ffd27f', '#8fd3ff', '#b58cff', '#9de39d', '#ffb3ff'];
+
+        calendarsCache = items;
+        items.forEach((c, idx) => {
+          const col = c.backgroundColor || palette[idx % palette.length];
+          calendarColors[c.id] = col;
+        });
+
+        if (selectedCalendarIds.length === 0) {
+          selectedCalendarIds = items.map(c => c.id);
+          saveCalendarSelection();
+        }
+
+        renderCalendarFilters();
+      } catch (err) {
+        console.error('calendarList.list エラー:', err);
+        if (calendarFilters) {
+          calendarFilters.textContent = 'カレンダー一覧を取得できませんでした。';
+        }
+      }
+    }
+
+    function renderCalendarFilters() {
+      if (!calendarFilters) return;
+      calendarFilters.innerHTML = '';
+
+      if (!calendarsCache.length) {
+        calendarFilters.textContent = '利用可能なカレンダーがありません。';
+        return;
+      }
+
+      calendarsCache.forEach(cal => {
+        const pill = document.createElement('div');
+        pill.className = 'calendar-pill';
+        if (selectedCalendarIds.includes(cal.id)) {
+          pill.classList.add('active');
+        }
+
+        const dot = document.createElement('span');
+        dot.className = 'cal-color-dot';
+        dot.style.background = calendarColors[cal.id] || '#ffffff';
+
+        const label = document.createElement('span');
+        label.textContent = cal.summary || cal.id;
+
+        pill.appendChild(dot);
+        pill.appendChild(label);
+
+        pill.addEventListener('click', () => {
+          const idx = selectedCalendarIds.indexOf(cal.id);
+          if (idx === -1) {
+            selectedCalendarIds.push(cal.id);
+            pill.classList.add('active');
+          } else {
+            selectedCalendarIds.splice(idx, 1);
+            pill.classList.remove('active');
+          }
+          saveCalendarSelection();
+          listTodayEvents();
+        });
+
+        calendarFilters.appendChild(pill);
+      });
+    }
+
+    authorizeButton.disabled = true;
+    restoreCalendarSelection();
+
+    authorizeButton.addEventListener('click', () => {
+      console.log('authorize_button クリック');
+      const first = !localStorage.getItem(GCAL_AUTH_KEY);
+      tokenClient.requestAccessToken({ prompt: first ? 'consent' : '' });
+    });
+
+    signoutButton.addEventListener('click', () => {
+      console.log('signout_button クリック');
+      const token = gapi.client.getToken();
+      if (token && token.access_token) {
+        google.accounts.oauth2.revoke(token.access_token, () => {
+          console.log('アクセストークン破棄');
+        });
+      }
+      localStorage.removeItem(GCAL_AUTH_KEY);
+      gapi.client.setToken(null);
+      gcalStatus.textContent = 'Googleカレンダー: 未接続';
+      authorizeButton.style.display = 'inline-block';
+      signoutButton.style.display = 'none';
+      eventsList.innerHTML = '<div class="small">接続すると今日の予定が表示されます。</div>';
+      if (calendarFilters) {
+        calendarFilters.innerHTML = '';
+      }
+    });
+
+    async function listTodayEvents() {
+      if (!calendarsCache.length) {
+        eventsList.innerHTML = '<div class="small">カレンダー情報を取得中...</div>';
+        return;
+      }
+
+      const activeCalendars = calendarsCache.filter(c =>
+        selectedCalendarIds.includes(c.id)
+      );
+
+      if (!activeCalendars.length) {
+        eventsList.innerHTML = '<div class="small">表示中のカレンダーが選択されていません。</div>';
+        return;
+      }
+
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+      eventsList.innerHTML = '<div class="small">予定を読み込み中...</div>';
+
+      try {
+        const promises = activeCalendars.map(cal =>
+          gapi.client.calendar.events.list({
+            calendarId: cal.id,
+            timeMin: start.toISOString(),
+            timeMax: end.toISOString(),
+            showDeleted: false,
+            singleEvents: true,
+            orderBy: 'startTime',
+          }).then(res => ({ cal, res }))
+        );
+
+        const results = await Promise.all(promises);
+        let allEvents = [];
+
+        results.forEach(({ cal, res }) => {
+          const evs = res.result.items || [];
+          evs.forEach(ev => {
+            allEvents.push({
+              ...ev,
+              _calendarSummary: cal.summary || cal.id,
+              _calendarId: cal.id,
+            });
+          });
+        });
+
+        if (!allEvents.length) {
+          eventsList.innerHTML = '<div class="small">今日の予定はありません。</div>';
+          renderGcalDayView([], []);
+          return;
+        }
+
+        allEvents.sort((a, b) => {
+          const aStart = a.start.dateTime || a.start.date;
+          const bStart = b.start.dateTime || b.start.date;
+          return new Date(aStart) - new Date(bStart);
+        });
+
+        // ★ 終日 / 時間あり で分割
+        const allDayEvents = [];
+        const timedEvents  = [];
+
+        allEvents.forEach(ev => {
+          if (!ev.start.dateTime && ev.start.date) {
+            allDayEvents.push(ev);
+          } else {
+            timedEvents.push(ev);
+          }
+        });
+
+        eventsList.innerHTML = '';
+        renderGcalDayView(timedEvents, allDayEvents);
+      } catch (err) {
+        console.error('events.list エラー:', err);
+        eventsList.innerHTML = '<div class="small">予定取得中にエラーが発生しました。</div>';
+      }
+    }
+
+    function renderGcalDayView(events, allDayEvents) {
+      const container = document.getElementById('gcalDayEvents');
+      const nowLine   = document.getElementById('gcalNowLine');
+      const allDayContainer = document.getElementById('gcalAllDayContainer');
+      if (!container) return;
+
+      // --- 終日エリア描画 ---
+      if (allDayContainer) {
+        allDayContainer.innerHTML = '';
+        if (!allDayEvents || !allDayEvents.length) {
+          allDayContainer.innerHTML = '<span class="small">終日の予定はありません。</span>';
+        } else {
+          allDayEvents.forEach(ev => {
+            const color = calendarColors[ev._calendarId] || '#ffffff';
+            const pill = document.createElement('span');
+            pill.className = 'gcal-all-day-pill';
+            pill.style.borderLeft = `4px solid ${color}`;
+            pill.style.paddingLeft = '6px';
+            pill.textContent = ev.summary || '(無題)';
+            allDayContainer.appendChild(pill);
+          });
+        }
+      }
+
+      // --- タイムライン側クリア（今線だけ残す） ---
+      const children = Array.from(container.children);
+      children.forEach(ch => {
+        if (ch !== nowLine) ch.remove();
+      });
+
+      if (!events || !events.length) {
+        const guide = document.createElement('div');
+        guide.className = 'small';
+        guide.style.position = 'absolute';
+        guide.style.left = '10px';
+        guide.style.top = '10px';
+        guide.textContent = '時間指定の予定はありません。';
+        container.appendChild(guide);
+        return;
+      }
+
+      const total = 24 * 60;
+
+      // 時間付きイベントを内部形式に変換
+      const items = events.map(ev => {
+        let startStr = ev.start.dateTime || ev.start.date;
+        let endStr   = ev.end?.dateTime || ev.end?.date || null;
+
+        let startDate = new Date(startStr);
+        let endDate   = endStr ? new Date(endStr) : null;
+
+        let startMin = startDate.getHours() * 60 + startDate.getMinutes();
+        let endMin   = endDate ? endDate.getHours() * 60 + endDate.getMinutes() : startMin + 60;
+
+        if (endMin <= startMin) endMin = startMin + 30;
+        if (endMin > total) endMin = total;
+
+        return { ev, startMin, endMin, col: 0 };
+      });
+
+      // 開始時間でソート
+      items.sort((a, b) => a.startMin - b.startMin);
+
+      // --- 重なり具合でグルーピング＋列割り ---
+      let groups = [];
+      let currentGroup = [];
+      let active = [];
+
+      items.forEach(item => {
+        active = active.filter(a => a.endMin > item.startMin);
+
+        if (active.length === 0 && currentGroup.length > 0) {
+          groups.push(currentGroup);
+          currentGroup = [];
+        }
+
+        const usedCols = new Set(active.map(a => a.col));
+        let col = 0;
+        while (usedCols.has(col)) col++;
+        item.col = col;
+
+        active.push(item);
+        currentGroup.push(item);
+      });
+
+      if (currentGroup.length > 0) {
+        groups.push(currentGroup);
+      }
+
+      // --- グループごとに描画 ---
+      groups.forEach(group => {
+        const maxCol   = Math.max(...group.map(g => g.col));
+        const colCount = maxCol + 1;
+        const colWidth = 100 / colCount;
+
+        group.forEach(item => {
+          const { ev, startMin, endMin, col } = item;
+
+          const topPercent    = (startMin / total) * 100;
+          const heightPercent = ((endMin - startMin) / total) * 100;
+
+          const block = document.createElement('div');
+          block.className = 'routine-block gcal-event-block';
+          block.style.top    = `${topPercent}%`;
+          block.style.height = `${heightPercent}%`;
+
+          if (colCount === 1) {
+            // 重なりなし → フル幅
+            block.style.left  = '3%';
+            block.style.right = '3%';
+          } else {
+            // 重なりあり → 横並び
+            const leftPercent  = col * colWidth;
+            const rightPercent = (colCount - col - 1) * colWidth;
+            block.style.left  = `${leftPercent + 1}%`;
+            block.style.right = `${rightPercent + 1}%`;
+          }
+
+          block.style.background = 'rgba(255,255,255,0.15)';
+
+          const color     = calendarColors[ev._calendarId] || '#ffffff';
+          const startDate = new Date(ev.start.dateTime || ev.start.date);
+
+          const isTimed   = !!ev.start.dateTime;
+          const timeLabel = isTimed
+            ? startDate.toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit' })
+            : '時間指定なし';
+
+          const summaryText  = ev.summary || '(無題)';
+          const calendarText = ev._calendarSummary || '';
+
+          // ★ 全部「時刻＋タイトル」1行表示＋省略
+          block.innerHTML = `
+            <div class="routine-block-time"
+                 style="border-left:4px solid ${color}; padding-left:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${timeLabel} ${summaryText}
+            </div>
+          `;
+
+          block.title = `${timeLabel} / ${summaryText}${calendarText ? ' @ ' + calendarText : ''}`;
+          container.appendChild(block);
+        });
+      });
+    }
+  </script>
+
+  <!-- gapi & GIS 読み込み -->
+  <script src="https://apis.google.com/js/api.js"
+          async defer
+          onload="gapiLoaded()"></script>
+
+  <script src="https://accounts.google.com/gsi/client"
+          async defer
+          onload="gisLoaded()"></script>
+
+  <!-- ===== PWA（Service Worker 登録 + 更新通知）===== -->
+  <script>
+    // 仕組み：
+    // - 更新が見つかったら「更新ボタン付き通知」を出す
+    // - ユーザーが押したときだけ切り替え（安全）
+    // - 設定画面から「更新チェック」もできる（C方式）
+
+    let swReg = null;
+
+    function addUpdateButtonToLastNotification(onClick) {
+      // 既存showNotificationが「文字だけ」なので、必要ならここをあなたのUIに合わせて改造してOK。
+      // 一番シンプルに：confirmで更新する方式にしてる（確実に動く）
+      const ok = confirm("新しいバージョンがあります。今すぐ更新しますか？");
+      if (ok) onClick();
+    }
+
+    async function registerSW() {
+      if (!("serviceWorker" in navigator)) return;
+
+      try {
+        swReg = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+
+        // 初回インストール直後
+        if (swReg.installing) {
+          // 初回は通知しない（うるさいので）
+        }
+
+        // 更新検知：新しいSWが見つかったら
+        swReg.addEventListener("updatefound", () => {
+          const newWorker = swReg.installing;
+          if (!newWorker) return;
+
+          newWorker.addEventListener("statechange", () => {
+            // 既にコントロールされている（=2回目以降）なら更新通知
+            if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+              // 右下通知＋更新ボタン
+              showNotification("アップデート", "新しいバージョンがあります。");
+              addUpdateButtonToLastNotification(() => {
+                // 新SWへ切り替え
+                newWorker.postMessage({ type: "SKIP_WAITING" });
+              });
+            }
+          });
+        });
+
+        // 新SWに切り替わったらリロードして最新反映
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          window.location.reload();
+        });
+      } catch (e) {
+        console.warn("SW register failed:", e);
+      }
+    }
+
+    // sw.js でメッセージ受けたい場合（SKIP_WAITING）
+    // sw.js側にこのハンドラも追加してね（下に貼る）
+    registerSW();
+
+    // ===== 手動更新チェック（設定にボタンを足す）=====
+    // 設定パネルにボタン追加（既存UIを崩さず増やす）
+    (function injectUpdateCheckButton() {
+      const panel = document.getElementById("settingsPanel");
+      if (!panel) return;
+
+      // 既にあるなら二重追加しない
+      if (document.getElementById("checkUpdateBtn")) return;
+
+      const section = document.createElement("div");
+      section.className = "settings-section";
+      section.innerHTML = `
+        <div class="settings-title">アプリ更新</div>
+        <div class="settings-buttons">
+          <button id="checkUpdateBtn" class="secondary small-btn">更新をチェック</button>
+        </div>
+        <div class="small">※ 新しい版があれば通知が出ます。</div>
+      `;
+      panel.appendChild(section);
+
+      section.querySelector("#checkUpdateBtn").addEventListener("click", async () => {
+        if (!swReg) {
+          showNotification("更新", "PWAがまだ初期化されていません。");
+          return;
+        }
+        try {
+          await swReg.update(); // サーバーに更新あるか問い合わせ
+          showNotification("更新", "更新チェックを実行しました。");
+        } catch (e) {
+          console.warn(e);
+          showNotification("更新", "更新チェックに失敗しました。");
+        }
+      });
+    })();
+  </script>
+
+  <!-- 通知コンテナ & サウンド -->
+  <div id="notificationContainer"></div>
+  <audio id="notifySound" src="./notify.mp3" preload="auto"></audio>
+
+  <script>
+    // ===== Service Worker 登録（PWAの土台）=====
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', async () => {
+        try {
+          const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+          console.log('✅ SW registered:', reg.scope);
+
+          // すでに待機中のSWがいたら「更新あり」状態（必要ならここで通知UI出せる）
+          if (reg.waiting) {
+            console.log('ℹ️ SW waiting (update available)');
+          }
+
+          // 更新検知
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (!newWorker) return;
+
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed') {
+                if (navigator.serviceWorker.controller) {
+                  console.log('🔁 New SW installed (update ready)');
+                  // ここで「更新があります」通知を出す実装にしてもOK
+                } else {
+                  console.log('🆕 SW installed (first install)');
+                }
+              }
+            });
+          });
+        } catch (err) {
+          console.error('❌ SW registration failed:', err);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
