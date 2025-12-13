@@ -63,22 +63,19 @@ async function networkFirstSafe(req) {
   }
 }
 
-async function cacheFirstSafe(req) {
+async function cacheFirst(req) {
   const cache = await caches.open(APP_CACHE);
   const cached = await cache.match(req);
   if (cached) return cached;
 
-  try {
-    const fresh = await fetch(req);
-    if (fresh && fresh.ok && fresh.status !== 206) {
-      try { await cache.put(req, fresh.clone()); } catch {}
-    }
-    return fresh;
-  } catch {
-    // ✅ ここが大事：fetch失敗でも落とさない
-    const fallback = await cache.match(req);
-    return fallback || new Response("", { status: 504, statusText: "Offline" });
+  const fresh = await fetch(req);
+
+  // 206(Partial Content) や opaque 等は cache.put が落ちやすいので避ける
+  if (fresh.ok && fresh.status === 200 && fresh.type !== "opaque") {
+    try { await cache.put(req, fresh.clone()); } catch (_) {}
   }
+
+  return fresh;
 }
 
 self.addEventListener("message", (event) => {
