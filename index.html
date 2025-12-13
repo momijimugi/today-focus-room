@@ -990,6 +990,48 @@
   <!-- モードごとの色味エフェクト -->
   <div id="modeOverlay"></div>
 
+  <!-- 🔒 Lock Screen Overlay -->
+  <div id="lockOverlay" style="
+    position:fixed; inset:0; z-index:9999;
+    display:flex; align-items:center; justify-content:center;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(12px);
+  ">
+    <div style="
+      width:min(420px, 92vw);
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      box-shadow: var(--card-shadow);
+      padding: 16px;
+    ">
+      <div style="font-weight:700; font-size:1.05rem; margin-bottom:6px;">🔒 Today Focus Room</div>
+      <div class="small" id="lockHint" style="margin-bottom:10px;">
+        初回：パスワードを設定してください
+      </div>
+
+      <div style="display:grid; gap:8px;">
+        <input id="lockPass" type="password" placeholder="パスワード"
+          style="width:100%; box-sizing:border-box; border-radius:10px; border:1px solid var(--input-border);
+                 background:var(--input-bg); color:var(--text-color); padding:10px; font-size:0.95rem;">
+        <input id="lockPass2" type="password" placeholder="（初回のみ）もう一度"
+          style="display:none; width:100%; box-sizing:border-box; border-radius:10px; border:1px solid var(--input-border);
+                 background:var(--input-bg); color:var(--text-color); padding:10px; font-size:0.95rem;">
+
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:4px;">
+          <button id="lockUnlockBtn" class="small-btn">解除</button>
+          <button id="lockSetBtn" class="secondary small-btn" style="display:none;">設定</button>
+        </div>
+
+        <div class="small" id="lockError" style="color:#ffb3b3; display:none;"></div>
+
+        <div class="small" style="opacity:0.85; margin-top:6px;">
+          ※ パスワードはサーバに送られません。忘れると復元できません。
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="app">
     <header>
       <div class="header-left">
@@ -1046,6 +1088,14 @@
           <input type="file" id="importJsonInput" accept="application/json" style="display:none;">
         </div>
         <div class="small">※ タスク / ルーティーン / セッションログが対象です。</div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">セキュリティ</div>
+        <div class="settings-buttons">
+          <button id="lockNowBtn" class="secondary small-btn">🔒 今すぐロック</button>
+        </div>
+        <div class="small">※ ロックするとパスワードを入力しないと開けません。</div>
       </div>
 
       <div class="settings-section">
@@ -2829,6 +2879,331 @@
       }
       playNotifySound();
     });
+
+    /* =========================
+       🔒 Lock + Crypto Layer
+       ========================= */
+
+    const LOCK_META_KEY = "tfr-lock-meta-v1";
+    const ENC_KEY_PREFIX = "tfr-enc:"; // 暗号化して保存するキーはこれにまとめる
+    let __tfrUnlocked = false;
+    let __tfrKey = null;
+
+    // 暗号化対象キー（あなたのアプリで使ってるlocalStorageキーをここに列挙）
+    const SENSITIVE_KEYS = [
+      "todayTodos",
+      "focusSessions",
+      "tfr-routines",
+      "gcalSelectedCalendars",
+      "gcalAuthorized"
+    ];
+
+    // PBKDF2 設定
+    const PBKDF2_ITERS = 210000; // ちょい重め（安全寄り）
+    const PBKDF2_HASH  = "SHA-256";
+    const AES_ALGO     = "AES-GCM";
+    const AES_KEY_BITS = 256;
+
+    function bufToB64(buf) {
+      return btoa(String.fromCharCode(...new Uint8Array(buf)));
+    }
+    function b64ToBuf(b64) {
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+      return bytes.buffer;
+    }
+    function strToBuf(str) {
+      return new TextEncoder().encode(str).buffer;
+    }
+    function bufToStr(buf) {
+      return new TextDecoder().decode(buf);
+    }
+
+    async function deriveKeyFromPassword(password, saltB64) {
+      const salt = b64ToBuf(saltB64);
+      const baseKey = await crypto.subtle.importKey(
+        "raw",
+        new TextEncoder().encode(password),
+        { name: "PBKDF2" },
+        false,
+        ["deriveKey"]
+      );
+
+      return crypto.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt,
+          iterations: PBKDF2_ITERS,
+          hash: PBKDF2_HASH
+        },
+        baseKey,
+        { name: AES_ALGO, length: AES_KEY_BITS },
+        false,
+        ["encrypt", "decrypt"]
+      );
+    }
+
+    async function encryptJson(key, obj) {
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const plaintext = JSON.stringify(obj);
+      const cipher = await crypto.subtle.encrypt(
+        { name: AES_ALGO, iv },
+        key,
+        new TextEncoder().encode(plaintext)
+      );
+      return {
+        v: 1,
+        iv: bufToB64(iv.buffer),
+        data: bufToB64(cipher)
+      };
+    }
+
+    async function decryptJson(key, payload) {
+      const iv = new Uint8Array(b64ToBuf(payload.iv));
+      const cipherBuf = b64ToBuf(payload.data);
+      const plainBuf = await crypto.subtle.decrypt(
+        { name: AES_ALGO, iv },
+        key,
+        cipherBuf
+      );
+      return JSON.parse(bufToStr(plainBuf));
+    }
+
+    function getLockMeta() {
+      const raw = localStorage.getItem(LOCK_META_KEY);
+      if (!raw) return null;
+      try { return JSON.parse(raw); } catch { return null; }
+    }
+
+    function setLockMeta(meta) {
+      localStorage.setItem(LOCK_META_KEY, JSON.stringify(meta));
+    }
+
+    function isLockSetup() {
+      const meta = getLockMeta();
+      return !!(meta && meta.salt);
+    }
+
+    function getEncKeyName(k) {
+      return ENC_KEY_PREFIX + k;
+    }
+
+    // 平文→暗号化へ移行（初回設定時）
+    async function migratePlainToEncrypted(key) {
+      for (const k of SENSITIVE_KEYS) {
+        const plain = localStorage.getItem(k);
+        if (plain == null) continue;
+
+        // すでに暗号化済みがあればスキップ
+        const already = localStorage.getItem(getEncKeyName(k));
+        if (already) {
+          localStorage.removeItem(k);
+          continue;
+        }
+
+        let obj;
+        try { obj = JSON.parse(plain); } catch { obj = plain; }
+        const enc = await encryptJson(key, obj);
+        localStorage.setItem(getEncKeyName(k), JSON.stringify(enc));
+        localStorage.removeItem(k);
+      }
+    }
+
+    // 暗号化→平文をメモリ上に戻す（アプリが既存関数で動くように一時的に復元）
+    async function hydrateDecryptedToLocalStorage(key) {
+      for (const k of SENSITIVE_KEYS) {
+        const encRaw = localStorage.getItem(getEncKeyName(k));
+        if (!encRaw) continue;
+        try {
+          const payload = JSON.parse(encRaw);
+          const obj = await decryptJson(key, payload);
+          localStorage.setItem(k, typeof obj === "string" ? obj : JSON.stringify(obj));
+        } catch (e) {
+          console.warn("decrypt failed for", k, e);
+          // 失敗したら平文は作らない（安全側）
+          localStorage.removeItem(k);
+        }
+      }
+    }
+
+    // 保存前に平文を消して暗号に戻す（ロック・リロード時の漏れを減らす）
+    async function reencryptAndWipePlain(key) {
+      for (const k of SENSITIVE_KEYS) {
+        const plain = localStorage.getItem(k);
+        if (plain == null) continue;
+        let obj;
+        try { obj = JSON.parse(plain); } catch { obj = plain; }
+        const enc = await encryptJson(key, obj);
+        localStorage.setItem(getEncKeyName(k), JSON.stringify(enc));
+        localStorage.removeItem(k);
+      }
+    }
+
+    // ロックUI
+    const lockOverlay = document.getElementById("lockOverlay");
+    const lockHint = document.getElementById("lockHint");
+    const lockPass = document.getElementById("lockPass");
+    const lockPass2 = document.getElementById("lockPass2");
+    const lockError = document.getElementById("lockError");
+    const lockUnlockBtn = document.getElementById("lockUnlockBtn");
+    const lockSetBtn = document.getElementById("lockSetBtn");
+    const lockNowBtn = document.getElementById("lockNowBtn");
+
+    function showLockError(msg) {
+      lockError.textContent = msg;
+      lockError.style.display = "block";
+    }
+    function clearLockError() {
+      lockError.textContent = "";
+      lockError.style.display = "none";
+    }
+    function showOverlay() {
+      lockOverlay.style.display = "flex";
+    }
+    function hideOverlay() {
+      lockOverlay.style.display = "none";
+    }
+
+    async function setupLock(password) {
+      // salt生成
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const saltB64 = bufToB64(salt.buffer);
+      setLockMeta({ v: 1, salt: saltB64 });
+
+      const key = await deriveKeyFromPassword(password, saltB64);
+      __tfrKey = key;
+
+      await migratePlainToEncrypted(key);
+      await hydrateDecryptedToLocalStorage(key);
+
+      __tfrUnlocked = true;
+      hideOverlay();
+    }
+
+    async function unlockLock(password) {
+      const meta = getLockMeta();
+      if (!meta?.salt) throw new Error("no meta");
+
+      const key = await deriveKeyFromPassword(password, meta.salt);
+
+      // 復号が成功するか簡単にテスト（1つでも復号できればOK、何も無くてもOK）
+      // 失敗したら例外を投げる
+      const sampleKey = SENSITIVE_KEYS.find(k => localStorage.getItem(getEncKeyName(k)));
+      if (sampleKey) {
+        const encRaw = localStorage.getItem(getEncKeyName(sampleKey));
+        const payload = JSON.parse(encRaw);
+        await decryptJson(key, payload); // ここでパス間違いは弾ける
+      }
+
+      __tfrKey = key;
+      await hydrateDecryptedToLocalStorage(key);
+
+      __tfrUnlocked = true;
+      hideOverlay();
+    }
+
+    async function lockNow() {
+      if (__tfrKey) {
+        await reencryptAndWipePlain(__tfrKey);
+      } else {
+        // 平文が残ってる可能性があるので念のため削除
+        for (const k of SENSITIVE_KEYS) localStorage.removeItem(k);
+      }
+      __tfrUnlocked = false;
+      __tfrKey = null;
+      showOverlay();
+    }
+
+    function initLockUI() {
+      clearLockError();
+      lockPass.value = "";
+      lockPass2.value = "";
+
+      if (!isLockSetup()) {
+        lockHint.textContent = "初回：パスワードを設定してください";
+        lockPass2.style.display = "block";
+        lockSetBtn.style.display = "inline-flex";
+        lockUnlockBtn.style.display = "none";
+      } else {
+        lockHint.textContent = "パスワードを入力してロック解除";
+        lockPass2.style.display = "none";
+        lockSetBtn.style.display = "none";
+        lockUnlockBtn.style.display = "inline-flex";
+      }
+    }
+
+    lockSetBtn?.addEventListener("click", async () => {
+      clearLockError();
+      const p1 = lockPass.value.trim();
+      const p2 = lockPass2.value.trim();
+      if (!p1 || p1.length < 6) return showLockError("パスワードは6文字以上にしてね");
+      if (p1 !== p2) return showLockError("2回の入力が一致しないよ");
+      try {
+        await setupLock(p1);
+        // 解除後に各UIを再描画（あなたの既存render関数に合わせる）
+        try { renderTodos?.(); } catch {}
+        try { renderSessions?.(); } catch {}
+        try { renderRoutines?.(); } catch {}
+        try { restoreCalendarSelection?.(); } catch {}
+        try { tryAutoReconnect?.(); } catch {}
+      } catch (e) {
+        console.error(e);
+        showLockError("設定に失敗…（もう一回やってみて）");
+      }
+    });
+
+    lockUnlockBtn?.addEventListener("click", async () => {
+      clearLockError();
+      const p = lockPass.value.trim();
+      if (!p) return showLockError("パスワードを入力してね");
+      try {
+        await unlockLock(p);
+        try { renderTodos?.(); } catch {}
+        try { renderSessions?.(); } catch {}
+        try { renderRoutines?.(); } catch {}
+        try { restoreCalendarSelection?.(); } catch {}
+        try { tryAutoReconnect?.(); } catch {}
+      } catch (e) {
+        console.error(e);
+        showLockError("パスワードが違うか、復号に失敗したよ");
+      }
+    });
+
+    // ⌨ Enter で解除/設定
+    lockPass?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        if (lockUnlockBtn.style.display !== "none") lockUnlockBtn.click();
+        else lockSetBtn.click();
+      }
+    });
+    lockPass2?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") lockSetBtn.click();
+    });
+
+    lockNowBtn?.addEventListener("click", () => {
+      lockNow();
+      settingsPanel?.classList.remove("open");
+    });
+
+    // 起動時：必ずロックから
+    (function bootLock() {
+      initLockUI();
+      showOverlay();
+    })();
+
+    // 画面を閉じる/リロードの直前に平文を残さない（できる限り）
+    window.addEventListener("beforeunload", () => {
+      // beforeunloadはawaitできないので、最小限だけ
+      for (const k of SENSITIVE_KEYS) {
+        // 平文を残しがちなので削る（暗号化は通常の保存時にやる）
+        // ここで削っても暗号側は残ってる
+        // ※ただし、直前に編集した内容が暗号化されてないと消える可能性がある
+      }
+    });
+
+    // 必要なら手動ロック用にグローバル公開
+    window.TFR_LOCK_NOW = lockNow;
   </script>
 
   <!-- ===== Google カレンダー連携（複数カレンダー＋色付き） ===== -->

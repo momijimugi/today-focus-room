@@ -84,3 +84,7 @@ async function cacheFirstSafe(req) {
 self.addEventListener("message", (event) => {
   if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
+
+document.getElementById("lockNowBtn")?.addEventListener("click", async () => {
+  await window.TFR_LOCK_NOW?.();
+});
