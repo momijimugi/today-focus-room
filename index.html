@@ -625,11 +625,18 @@
     }
 
     .routine-time-axis {
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
+      position: relative;
+      height: 100%;
       font-size: 0.7rem;
       color: var(--muted-text);
+    }
+
+    .routine-time-axis span {
+      position: absolute;
+      right: 0;
+      transform: translateY(-50%);
+      padding-right: 2px;
+      background: transparent;
     }
 
     .routine-events {
@@ -663,7 +670,7 @@
       left: 0;
       right: auto;
       width: 100%;
-      min-height: 24px;
+      min-height: 16px;
       border-radius: 8px;
       background: rgba(255,255,255,0.14);
       border: 1px solid rgba(255,255,255,0.22);
@@ -675,7 +682,65 @@
       cursor: default;
       box-shadow: 0 2px 6px rgba(0,0,0,0.35);
       overflow: hidden; /* はみ出し防止 */
-      border-left: 4px solid rgba(255,255,255,0.55);
+      border-left: 3px solid rgba(255,255,255,0.55);
+      box-sizing: border-box;
+    }
+
+    .routine-block.short {
+      overflow: visible; /* ツールチップを表示するため */
+    }
+
+    .routine-block.short .routine-block-body {
+      flex-direction: row;
+      align-items: center;
+      gap: 4px;
+      padding-top: 2px;
+      padding-bottom: 2px;
+      padding-left: 6px;
+      padding-right: 6px;
+    }
+
+    .routine-block.short .routine-block-time,
+    .routine-block.short .routine-block-label {
+      font-size: 0.72rem;
+      line-height: 1.1;
+      white-space: nowrap;
+    }
+
+    .routine-block.short .routine-block-label {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* 短いブロックのホバー時ツールチップ */
+    .routine-block.short::after {
+      content: attr(data-fulltext);
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 100%;
+      margin-bottom: 4px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: var(--card-bg);
+      color: var(--text-color);
+      border: 1px solid var(--card-border);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+      font-size: 0.74rem;
+      line-height: 1.2;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(6px);
+      transition: opacity 0.12s ease-out, transform 0.12s ease-out;
+      white-space: normal;
+    }
+
+    .routine-block.short:hover::after,
+    .routine-block.short:focus-within::after {
+      opacity: 1;
+      transform: translateY(0);
     }
 
     /* 上下リサイズ用ハンドル：ブロックの上下端に固定 */
@@ -683,7 +748,7 @@
       position: absolute;
       left: 4px;
       right: 4px;
-      height: 3px;
+      height: 2px;
       border-radius: 999px;
       background: rgba(255,255,255,0.4);
       opacity: 0.5;
@@ -709,8 +774,8 @@
       align-items: center;
       gap: 8px;
       cursor: default;
-      padding-top: 6px;
-      padding-bottom: 6px;
+      padding-top: 4px;
+      padding-bottom: 4px;
     }
 
     /* 左側のドラッグ用ハンドル（位置はそのままでOK） */
@@ -729,7 +794,7 @@
 
     .routine-block-time {
       font-weight: 600;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
     }
 
     .routine-block-label {
@@ -2303,6 +2368,27 @@
       return `${h}:${m}`;
     }
 
+    // 3:00-6:00 を圧縮して、それ以外の時間帯を少し広く見せるためのマッピング
+    const COMPRESS_START = 3 * 60; // 180
+    const COMPRESS_END   = 6 * 60; // 360
+    const COMPRESS_RATIO = 0.4;    // 3時間を約1.2時間相当に圧縮
+    const COMPRESS_LEN   = COMPRESS_END - COMPRESS_START;
+    const ADJUSTED_TOTAL = 24 * 60 - (COMPRESS_LEN * (1 - COMPRESS_RATIO));
+
+    function minuteToAdjustedPercent(mins) {
+      mins = Math.max(0, Math.min(24 * 60, mins));
+      if (mins <= COMPRESS_START) {
+        return (mins / ADJUSTED_TOTAL) * 100;
+      }
+      if (mins >= COMPRESS_END) {
+        const after = COMPRESS_START + COMPRESS_LEN * COMPRESS_RATIO + (mins - COMPRESS_END);
+        return (after / ADJUSTED_TOTAL) * 100;
+      }
+      // 圧縮帯
+      const compressed = COMPRESS_START + (mins - COMPRESS_START) * COMPRESS_RATIO;
+      return (compressed / ADJUSTED_TOTAL) * 100;
+    }
+
     function renderRoutines() {
       if (!routineEvents) return;
       const total    = 24 * 60;
@@ -2325,7 +2411,7 @@
             ...r,
             startMin,
             endMin,
-            label: r.label || '(?????????)',
+            label: r.label || '(無題のルーティーン)',
           };
         })
         .filter(Boolean)
@@ -2340,7 +2426,7 @@
         guide.style.position = 'absolute';
         guide.style.left = '10px';
         guide.style.top  = '10px';
-        guide.textContent = '???????????????????????';
+        guide.textContent = '右下のフォームからルーティーンを追加できます。';
         routineEvents.appendChild(guide);
         return;
       }
@@ -2351,7 +2437,7 @@
       let closestId   = null;
       let closestDiff = Infinity;
 
-      // ?????????????????????
+      // どのブロックが「今に一番近いか」を先に計算
       normalized.forEach(r => {
         const s = r.startMin;
         const e = r.endMin;
@@ -2366,50 +2452,48 @@
         }
       });
 
-      // ??????????????????????????????????????
+      // 重なりを解消するために、アクティブな予定に列番号を割り当てる
       const groups = [];
       let currentGroup = [];
-      let groupEnd = -1;
+      let active = [];
 
-      normalized.forEach((r) => {
-        if (!currentGroup.length || r.startMin < groupEnd) {
-          currentGroup.push(r);
-          groupEnd = Math.max(groupEnd, r.endMin);
-        } else {
+      normalized.forEach((item) => {
+        // 終了済みを除外
+        active = active.filter(a => a.endMin > item.startMin);
+
+        // アクティブが空になったらグループ確定
+        if (active.length === 0 && currentGroup.length > 0) {
           groups.push(currentGroup);
-          currentGroup = [r];
-          groupEnd = r.endMin;
+          currentGroup = [];
         }
+
+        const usedCols = new Set(active.map(a => a.column));
+        let col = 0;
+        while (usedCols.has(col)) col++;
+        item.column = col;
+
+        active.push(item);
+        currentGroup.push(item);
       });
+
       if (currentGroup.length) {
         groups.push(currentGroup);
       }
 
-      groups.forEach((group) => {
-        const columnEnds = [];
-        group.forEach((item) => {
-          let colIndex = columnEnds.findIndex((end) => item.startMin >= end);
-          if (colIndex === -1) {
-            colIndex = columnEnds.length;
-            columnEnds.push(item.endMin);
-          } else {
-            columnEnds[colIndex] = item.endMin;
-          }
-          item.column = colIndex;
-        });
-        const colCount = Math.max(1, columnEnds.length);
-        group.forEach((item) => {
-          item.columnCount = colCount;
+      // グループごとに列数を付与
+      groups.forEach(group => {
+        const maxCol = Math.max(...group.map(g => g.column || 0));
+        const colCount = maxCol + 1;
+        group.forEach(g => {
+          g.columnCount = colCount;
         });
       });
 
       const columnGapPx = 6;
 
       normalized.forEach(r => {
-        const topPercent    = (r.startMin / total) * 100;
-        const heightPercent = ((r.endMin - r.startMin) / total) * 100;
-        const widthPercent  = 100 / (r.columnCount || 1);
-        const leftPercent   = widthPercent * (r.column || 0);
+        const topPercent    = minuteToAdjustedPercent(r.startMin);
+        const heightPercent = Math.max(minuteToAdjustedPercent(r.endMin) - topPercent, (30 / ADJUSTED_TOTAL) * 100);
 
         const block = document.createElement('div');
         block.className = 'routine-block';
@@ -2418,17 +2502,40 @@
         }
         block.dataset.id   = r.id;
         block.style.top    = `${topPercent}%`;
-        block.style.height = `${Math.max(heightPercent, (30 / total) * 100)}%`;
-        block.style.left   = `calc(${leftPercent}% + ${columnGapPx / 2}px)`;
+        block.style.height = `${heightPercent}%`;
         block.style.right  = 'auto';
-        block.style.width  = `calc(${widthPercent}% - ${columnGapPx}px)`;
+
+        const colCount = r.columnCount || 1;
+        const col      = r.column || 0;
+
+        if (colCount === 1) {
+          // 重なりなし：左右に少し余白
+          block.style.left  = '3%';
+          block.style.right = '3%';
+        } else {
+          const colWidth     = 100 / colCount;
+          const leftPercent  = col * colWidth;
+          const rightPercent = (colCount - col - 1) * colWidth;
+          // 少しだけ余白を足して被りを避ける
+          block.style.left  = `calc(${leftPercent}% + 2%)`;
+          block.style.right = `calc(${rightPercent}% + 2%)`;
+        }
 
         const accent = colorFromString(r.label || r.id || '');
         block.style.borderLeftColor = accent;
-
         const endLabel   = r.end || minutesToTimeString(r.endMin);
         const startLabel = r.start || minutesToTimeString(r.startMin);
-        const label      = r.label || '(?????????)';
+        const label      = r.label || '(無題のルーティーン)';
+
+        const durationMin = r.endMin - r.startMin;
+        const isShort = durationMin <= 45;
+        if (isShort) {
+          block.classList.add('short');
+          block.dataset.fulltext = `${startLabel}〜${endLabel} ${label}`;
+        } else {
+          block.removeAttribute('data-fulltext');
+        }
+        block.title = `${startLabel}〜${endLabel} ${label}`;
 
         block.innerHTML = `
           <div class="routine-resize-handle routine-resize-top" data-id="${r.id}"></div>
@@ -2439,8 +2546,10 @@
           </div>
           <div class="routine-resize-handle routine-resize-bottom" data-id="${r.id}"></div>
         `;
+
         routineEvents.appendChild(block);
       });
+      updateRoutineAxisTicks();
     }
 
 
@@ -2715,8 +2824,22 @@
       if (!routineNowLine || !routineEvents) return;
       const now     = new Date();
       const minutes = now.getHours() * 60 + now.getMinutes();
-      const percent = (minutes / (24 * 60)) * 100;
+      const percent = minuteToAdjustedPercent(minutes);
       routineNowLine.style.top = `${percent}%`;
+    }
+
+    function updateRoutineAxisTicks() {
+      const axis = document.querySelector('#routineCard .routine-time-axis');
+      if (!axis) return;
+      const spans = Array.from(axis.querySelectorAll('span'));
+      const tickMinutes = [0, 6 * 60, 12 * 60, 18 * 60, 24 * 60];
+      spans.forEach((span, idx) => {
+        const mins = tickMinutes[idx] ?? (idx / Math.max(1, spans.length - 1)) * 24 * 60;
+        span.style.position = 'absolute';
+        span.style.top = `${minuteToAdjustedPercent(mins)}%`;
+        span.style.right = '0';
+        span.style.transform = 'translateY(-50%)';
+      });
     }
 
     function updateGcalNowMarker() {
