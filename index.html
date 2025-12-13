@@ -643,6 +643,8 @@
         transparent 1px
       );
       background-size: 100% 30px;
+      padding: 4px 6px;
+      box-sizing: border-box;
       overflow: hidden;
     }
 
@@ -658,8 +660,9 @@
     /* ルーティーンブロック本体 */
     .routine-block {
       position: absolute;
-      left: 6px;
-      right: 6px;
+      left: 0;
+      right: auto;
+      width: 100%;
       min-height: 24px;
       border-radius: 8px;
       background: rgba(255,255,255,0.14);
@@ -2302,43 +2305,56 @@
 
     function renderRoutines() {
       if (!routineEvents) return;
-      const routines = loadRoutines().sort((a, b) => {
-        if (a.start < b.start) return -1;
-        if (a.start > b.start) return 1;
-        return 0;
-      });
+      const total    = 24 * 60;
+      const routines = loadRoutines();
 
       const children = Array.from(routineEvents.children);
       children.forEach(ch => {
         if (ch !== routineNowLine) ch.remove();
       });
 
-      if (!routines.length) {
+      const normalized = routines
+        .map((r) => {
+          const startMin = timeStringToMinutes(r.start);
+          let endMin     = timeStringToMinutes(r.end);
+          if (startMin == null) return null;
+          if (endMin == null || endMin <= startMin) endMin = startMin + 30;
+          if (endMin > total) endMin = total;
+
+          return {
+            ...r,
+            startMin,
+            endMin,
+            label: r.label || '(?????????)',
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => {
+          if (a.startMin !== b.startMin) return a.startMin - b.startMin;
+          return a.endMin - b.endMin;
+        });
+
+      if (!normalized.length) {
         const guide = document.createElement('div');
         guide.className = 'small';
         guide.style.position = 'absolute';
         guide.style.left = '10px';
         guide.style.top  = '10px';
-        guide.textContent = '右下のフォームからルーティーンを追加できます。';
+        guide.textContent = '???????????????????????';
         routineEvents.appendChild(guide);
         return;
       }
 
-      const total = 24 * 60;
       const now   = new Date();
       const nowMin = now.getHours() * 60 + now.getMinutes();
 
       let closestId   = null;
       let closestDiff = Infinity;
 
-      // どのブロックが「今に一番近いか」を先に計算
-      routines.forEach(r => {
-        const s = timeStringToMinutes(r.start);
-        let e   = timeStringToMinutes(r.end);
-        if (s == null) return;
-        if (e == null || e <= s) e = s + 30;
-        if (e > total) e = total;
-
+      // ?????????????????????
+      normalized.forEach(r => {
+        const s = r.startMin;
+        const e = r.endMin;
         let diff;
         if (nowMin < s) diff = s - nowMin;
         else if (nowMin > e) diff = nowMin - e;
@@ -2350,15 +2366,50 @@
         }
       });
 
-      routines.forEach(r => {
-        const startMin = timeStringToMinutes(r.start);
-        let endMin     = timeStringToMinutes(r.end);
-        if (startMin == null) return;
-        if (endMin == null || endMin <= startMin) endMin = startMin + 30;
-        if (endMin > total) endMin = total;
+      // ??????????????????????????????????????
+      const groups = [];
+      let currentGroup = [];
+      let groupEnd = -1;
 
-        const topPercent    = (startMin / total) * 100;
-        const heightPercent = ((endMin - startMin) / total) * 100;
+      normalized.forEach((r) => {
+        if (!currentGroup.length || r.startMin < groupEnd) {
+          currentGroup.push(r);
+          groupEnd = Math.max(groupEnd, r.endMin);
+        } else {
+          groups.push(currentGroup);
+          currentGroup = [r];
+          groupEnd = r.endMin;
+        }
+      });
+      if (currentGroup.length) {
+        groups.push(currentGroup);
+      }
+
+      groups.forEach((group) => {
+        const columnEnds = [];
+        group.forEach((item) => {
+          let colIndex = columnEnds.findIndex((end) => item.startMin >= end);
+          if (colIndex === -1) {
+            colIndex = columnEnds.length;
+            columnEnds.push(item.endMin);
+          } else {
+            columnEnds[colIndex] = item.endMin;
+          }
+          item.column = colIndex;
+        });
+        const colCount = Math.max(1, columnEnds.length);
+        group.forEach((item) => {
+          item.columnCount = colCount;
+        });
+      });
+
+      const columnGapPx = 6;
+
+      normalized.forEach(r => {
+        const topPercent    = (r.startMin / total) * 100;
+        const heightPercent = ((r.endMin - r.startMin) / total) * 100;
+        const widthPercent  = 100 / (r.columnCount || 1);
+        const leftPercent   = widthPercent * (r.column || 0);
 
         const block = document.createElement('div');
         block.className = 'routine-block';
@@ -2368,18 +2419,22 @@
         block.dataset.id   = r.id;
         block.style.top    = `${topPercent}%`;
         block.style.height = `${Math.max(heightPercent, (30 / total) * 100)}%`;
+        block.style.left   = `calc(${leftPercent}% + ${columnGapPx / 2}px)`;
+        block.style.right  = 'auto';
+        block.style.width  = `calc(${widthPercent}% - ${columnGapPx}px)`;
 
         const accent = colorFromString(r.label || r.id || '');
         block.style.borderLeftColor = accent;
 
-        const endLabel = r.end || minutesToTimeString(endMin);
-        const label    = r.label || '(無題のルーティーン)';
+        const endLabel   = r.end || minutesToTimeString(r.endMin);
+        const startLabel = r.start || minutesToTimeString(r.startMin);
+        const label      = r.label || '(?????????)';
 
         block.innerHTML = `
           <div class="routine-resize-handle routine-resize-top" data-id="${r.id}"></div>
           <div class="routine-block-body" data-id="${r.id}">
             <div class="routine-drag-handle" data-id="${r.id}"></div>
-            <div class="routine-block-time">${r.start || '--:--'}〜${endLabel}</div>
+            <div class="routine-block-time">${startLabel}〜${endLabel}</div>
             <div class="routine-block-label">${label}</div>
           </div>
           <div class="routine-resize-handle routine-resize-bottom" data-id="${r.id}"></div>
@@ -2387,6 +2442,7 @@
         routineEvents.appendChild(block);
       });
     }
+
 
     // ルーティーン追加ボタン
     if (addRoutineBtn) {
