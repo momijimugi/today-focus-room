@@ -1111,6 +1111,7 @@
       </div>
       <div class="header-right">
         <button id="themeToggle" class="secondary small-btn">🌓</button>
+        <button id="fullscreenToggle" class="secondary small-btn">⛶ 全画面</button>
         <button id="settingsToggle" class="secondary small-btn">⚙ 設定</button>
         <button id="authorize_button">Google カレンダー連携</button>
         <button id="signout_button" style="display:none;" class="secondary small-btn">ログアウト</button>
@@ -1458,6 +1459,35 @@
       const current = document.body.getAttribute('data-theme') || 'dark';
       applyTheme(current === 'dark' ? 'light' : 'dark');
     });
+
+    const fullscreenToggle = document.getElementById('fullscreenToggle');
+
+    function syncFullscreenButton() {
+      if (!fullscreenToggle) return;
+      fullscreenToggle.textContent = document.fullscreenElement ? '× 全画面解除' : '⛶ 全画面';
+    }
+
+    async function toggleFullscreen() {
+      if (!fullscreenToggle) return;
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        } else {
+          await document.exitFullscreen();
+        }
+      } catch (e) {
+        console.error(e);
+        alert('全画面モードの切り替えに失敗しました。');
+      } finally {
+        syncFullscreenButton();
+      }
+    }
+
+    if (fullscreenToggle) {
+      fullscreenToggle.addEventListener('click', toggleFullscreen);
+      document.addEventListener('fullscreenchange', syncFullscreenButton);
+      syncFullscreenButton();
+    }
 
     // DOM構築後にフォントセレクトと連動
     window.addEventListener('DOMContentLoaded', () => {

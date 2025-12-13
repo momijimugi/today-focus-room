@@ -1,5 +1,5 @@
 /* sw.js */
-const APP_CACHE_VERSION = "tfr-v6";
+const APP_CACHE_VERSION = "tfr-v7";
 const APP_CACHE = APP_CACHE_VERSION;
 
 const CORE_ASSETS = [
