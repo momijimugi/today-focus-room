@@ -3262,7 +3262,6 @@
         console.log('gapi.client.init 完了');
         gapiInited = true;
         maybeEnableAuthButton();
-        tryAutoReconnect();
       } catch (err) {
         console.error('gapi.client.init エラー:', err);
         gcalStatus.textContent = 'Googleカレンダー: 初期化エラー';
@@ -3294,20 +3293,23 @@
       });
       gisInited = true;
       maybeEnableAuthButton();
-      tryAutoReconnect();
     }
 
     function maybeEnableAuthButton() {
       if (gapiInited && gisInited) {
         authorizeButton.disabled = false;
-        tryAutoReconnect();
       }
     }
 
     function tryAutoReconnect() {
-      if (localStorage.getItem(GCAL_AUTH_KEY) && tokenClient && gapiInited && gisInited) {
-        console.log('GCAL auto reconnect');
-        tokenClient.requestAccessToken({ prompt: '' });
+      // ✅ ここでは requestAccessToken を呼ばない（=ポップアップ系を起動しない）
+      // ローカル状態だけ見て「接続済み表示」にする or ボタンを出す、に留める
+      const wasAuthed = !!localStorage.getItem(GCAL_AUTH_KEY);
+
+      if (wasAuthed) {
+        gcalStatus.textContent = 'Googleカレンダー: 再接続できます（ボタンを押してください）';
+        authorizeButton.style.display = 'inline-block';
+        signoutButton.style.display = 'none';
       }
     }
 
