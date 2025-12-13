@@ -1,5 +1,5 @@
 /* sw.js */
-const APP_CACHE_VERSION = "tfr-v3"; // ★更新したら必ず上げる
+const APP_CACHE_VERSION = "tfr-v1";
 const APP_CACHE = APP_CACHE_VERSION;
 
 const CORE_ASSETS = [
@@ -7,10 +7,9 @@ const CORE_ASSETS = [
   "./index.html",
   "./manifest.webmanifest",
   "./sw.js",
-  "./notify.mp3",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "./favicon.ico", // あるなら。無いなら消してOK
+  "./notify.mp3",
 ];
 
 self.addEventListener("install", (event) => {
@@ -34,28 +33,33 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
 
   const url = new URL(req.url);
+
+  // 同一オリジンだけ
   if (url.origin !== self.location.origin) return;
 
-  // ✅ Range(部分取得) はそのままネットへ（206問題回避）
+  // ✅ Range (206) はキャッシュしない（音声/動画で死にがち）
   if (req.headers.has("range")) {
     event.respondWith(fetch(req));
     return;
   }
 
-  const accept = req.headers.get("accept") || "";
-  const isHTML = accept.includes("text/html");
+  const isHTML = req.headers.get("accept")?.includes("text/html");
 
-  // HTMLはNetwork First、それ以外はCache First（ただし失敗時に落ちない）
-  event.respondWith(isHTML ? networkFirstSafe(req) : cacheFirstSafe(req));
+  if (isHTML) {
+    event.respondWith(networkFirst(req));
+  } else {
+    event.respondWith(cacheFirstSafe(req));
+  }
 });
 
-async function networkFirstSafe(req) {
+async function networkFirst(req) {
   const cache = await caches.open(APP_CACHE);
   try {
     const fresh = await fetch(req);
-    if (fresh && fresh.ok && fresh.status !== 206) {
-      try { await cache.put(req, fresh.clone()); } catch {}
-    }
+
+    // cache.put が落ちてもページは返す
+    try { await cache.put(req, fresh.clone()); } catch (_) {}
+
     return fresh;
   } catch {
     const cached = await cache.match(req);
@@ -63,25 +67,19 @@ async function networkFirstSafe(req) {
   }
 }
 
-async function cacheFirst(req) {
+async function cacheFirstSafe(req) {
   const cache = await caches.open(APP_CACHE);
   const cached = await cache.match(req);
   if (cached) return cached;
 
   const fresh = await fetch(req);
 
-  // 206(Partial Content) や opaque 等は cache.put が落ちやすいので避ける
-  if (fresh.ok && fresh.status === 200 && fresh.type !== "opaque") {
-    try { await cache.put(req, fresh.clone()); } catch (_) {}
-  }
+  // ✅ opaque / 206 / 失敗を飲み込む
+  try { await cache.put(req, fresh.clone()); } catch (_) {}
 
   return fresh;
 }
 
 self.addEventListener("message", (event) => {
   if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
-});
-
-document.getElementById("lockNowBtn")?.addEventListener("click", async () => {
-  await window.TFR_LOCK_NOW?.();
 });
