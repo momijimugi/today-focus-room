@@ -1723,6 +1723,7 @@
 
     // ===== ポモドーロタイマー =====
     let timerInterval = null;
+    let timerEndTime = null;
     let remainingSeconds = 25 * 60;
     let isFocusMode = true;
     let sessionStartTime = null;
@@ -1730,7 +1731,14 @@
     const timerDisplay = document.getElementById('timerDisplay');
     const timerMode = document.getElementById('timerMode');
 
+    function syncRemainingWithEndTime() {
+      if (!timerEndTime) return;
+      const diffMs = timerEndTime - Date.now();
+      remainingSeconds = Math.max(0, Math.ceil(diffMs / 1000));
+    }
+
     function updateTimerDisplay() {
+      syncRemainingWithEndTime();
       const m = Math.floor(remainingSeconds / 60);
       const s = remainingSeconds % 60;
       timerDisplay.textContent =
@@ -1745,6 +1753,7 @@
       timerMode.textContent = focus ? 'モード: 集中' : 'モード: 休憩';
       document.getElementById('switchModeBtn').textContent = focus ? '休憩に切替' : '集中に切替';
       sessionStartTime = null;
+      timerEndTime = null;
       updateTimerDisplay();
 
       // ★ 画面エフェクト用のクラス切り替え
@@ -1755,24 +1764,26 @@
     function startTimer() {
       if (timerInterval) return;
       if (!sessionStartTime) sessionStartTime = new Date();
+      timerEndTime = Date.now() + remainingSeconds * 1000;
+      updateTimerDisplay();
       timerInterval = setInterval(() => {
-        remainingSeconds--;
+        updateTimerDisplay();
         if (remainingSeconds <= 0) {
           clearInterval(timerInterval);
           timerInterval = null;
-          remainingSeconds = 0;
-          updateTimerDisplay();
+          timerEndTime = null;
           handleSessionEnd(true); // 自動終了
-        } else {
-          updateTimerDisplay();
         }
       }, 1000);
     }
 
     function pauseTimer() {
       if (!timerInterval) return;
+      syncRemainingWithEndTime();
       clearInterval(timerInterval);
       timerInterval = null;
+      timerEndTime = null;
+      updateTimerDisplay();
     }
 
     function resetTimer() {
@@ -1796,6 +1807,12 @@
       remainingSeconds = 0;
       updateTimerDisplay();
       handleSessionEnd(false); // 手動終了
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && timerInterval) {
+        updateTimerDisplay();
+      }
     });
 
     setMode(true); // 初期は集中
