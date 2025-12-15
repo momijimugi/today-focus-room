@@ -2477,6 +2477,9 @@
         guide.style.top  = '10px';
         guide.textContent = '右下のフォームからルーティーンを追加できます。';
         routineEvents.appendChild(guide);
+        // ★追加：予定が0件でも時刻ラベル位置を計算して反映
+        try { updateRoutineAxisTicks(); } catch (e) { }
+
         return;
       }
 
@@ -2724,8 +2727,11 @@
       newStart = Math.round(newStart / 5) * 5;
       newEnd   = Math.round(newEnd   / 5) * 5;
 
-      const topPercent    = (newStart / total) * 100;
-      const heightPercent = ((newEnd - newStart) / total) * 100;
+      const topPercent = minuteToAdjustedPercent(newStart);
+      const heightPercent = Math.max(
+        minuteToAdjustedPercent(newEnd) - topPercent,
+        (30 / ADJUSTED_TOTAL) * 100
+      );
 
       const block = routineEvents.querySelector(`.routine-block[data-id="${routineDrag.id}"]`);
       if (block) {
@@ -2902,11 +2908,34 @@
       gcalNowLine.style.top = `${percent}%`;
     }
 
+    // カレンダー（gcal）側の軸ラベルを正しい位置に配置する
+    function updateGcalAxisTicks() {
+      const axis = document.querySelector('#calendarCard .routine-time-axis');
+      if (!axis) return;
+
+      const spans = Array.from(axis.querySelectorAll('span'));
+      const tickMinutes = [0, 6 * 60, 12 * 60, 18 * 60, 24 * 60];
+      const total = 24 * 60;
+
+      spans.forEach((span, idx) => {
+        const mins = tickMinutes[idx] ?? 0;
+        span.style.position = 'absolute';
+        span.style.top = `${(mins / total) * 100}%`;
+        span.style.right = '0';
+        span.style.transform = 'translateY(-50%)';
+      });
+    }
+
     renderRoutines();
     updateRoutineNowMarker();
     updateGcalNowMarker();
+    updateGcalAxisTicks();
     setInterval(updateRoutineNowMarker, 60 * 1000);
     setInterval(updateGcalNowMarker, 60 * 1000);
+    window.addEventListener('resize', () => {
+      try { updateGcalAxisTicks(); } catch {}
+      try { updateRoutineAxisTicks?.(); } catch {}
+    });
 
     // ===== 通知まわり =====
     function loadRoutineNotifyState() {
@@ -3860,6 +3889,7 @@
           container.appendChild(block);
         });
       });
+      updateGcalAxisTicks();
     }
   </script>
 
